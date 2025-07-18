@@ -1,21 +1,20 @@
 package com.jpc.exercise.producer;
 
-import com.jpc.exercise.account.application.BankAccountService;
-import com.jpc.exercise.account.domain.model.Transaction;
-import com.jpc.exercise.producer.model.ProducerConfig;
-import com.jpc.exercise.producer.TransactionProducer;
-
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.jpc.exercise.account.application.BankAccountService;
+import com.jpc.exercise.account.domain.model.Transaction;
+import com.jpc.exercise.producer.model.ProducerConfig;
 
 public class TransactionProducerOrchestrator {
 
-    private static final Logger logger = Logger.getLogger(TransactionProducerOrchestrator.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(TransactionProducerOrchestrator.class);
 
     private final TransactionProducer creditProducer;
     private final TransactionProducer debitProducer;
@@ -37,6 +36,8 @@ public class TransactionProducerOrchestrator {
     }
 
     public void startEmitLoops(ProducerConfig config) {
+        logger.info("Starting transaction emission: {} transactions per stream over {} seconds.",
+                config.count(), config.intervalSeconds());
         executor.submit(() -> emitLoop(creditProducer, config));
         executor.submit(() -> emitLoop(debitProducer, config));
     }
@@ -45,16 +46,21 @@ public class TransactionProducerOrchestrator {
         long spacingNanos = TimeUnit.SECONDS.toNanos(config.intervalSeconds()) / config.count();
         long nextTick = System.nanoTime();
 
-        for (int i = 0; i < config.count(); i++) {
-            Transaction tx = producer.produce();
-            accountService.processTransaction(tx);
-            queue.offer(tx);
+        try {
+            for (int i = 0; i < config.count(); i++) {
+                Transaction tx = producer.produce();
+                accountService.processTransaction(tx);
+                queue.offer(tx);
 
-            nextTick += spacingNanos;
-            long sleepTime = nextTick - System.nanoTime();
-            if (sleepTime > 0) {
-                LockSupport.parkNanos(sleepTime);
+                nextTick += spacingNanos;
+                long sleepTime = nextTick - System.nanoTime();
+                if (sleepTime > 0) {
+                    LockSupport.parkNanos(sleepTime);
+                }
             }
+            logger.info("Emission completed for producer: {}", producer.getClass().getSimpleName());
+        } catch (Exception e) {
+            logger.error("Transaction emission failed for producer {}: {}", producer.getClass().getSimpleName(), e.getMessage(), e);
         }
     }
 }

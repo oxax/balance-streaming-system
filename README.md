@@ -1,6 +1,7 @@
 # Balance Streaming System
 **High-Throughput, Low-Latency Transaction Engine**
  A latency-sensitive Java service that simulates streaming credit/debit events, maintains accurate balance state, and submits cost-constrained audit batches for external review. Designed with microservice-ready modularity and performance-aware architecture.
+ This system is designed to be modular and testable, with clear pathways to scale: transaction ingestion can later be offloaded to a durable event broker (e.g. Kafka), and batching can be distributed via consumer groups without redesigning core interfaces.
 
  ---
 
@@ -15,3 +16,4 @@ Design an application that:
 - Exposes rich metrics and supports performance validation.
 
 ---
+

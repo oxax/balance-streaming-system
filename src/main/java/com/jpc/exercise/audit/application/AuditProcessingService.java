@@ -6,6 +6,9 @@ import java.util.UUID;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.jpc.exercise.account.domain.model.Transaction;
 import com.jpc.exercise.audit.domain.model.AuditBatch;
 import com.jpc.exercise.audit.domain.service.BatchingAlgorithm;
@@ -14,6 +17,7 @@ import com.jpc.exercise.shared.audit.AuditNotifier;
 
 public class AuditProcessingService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuditProcessingService.class);
     private static final int SUBMISSION_LIMIT = 1000;
 
     private final LinkedTransferQueue<Transaction> transactionQueue;
@@ -35,6 +39,7 @@ public class AuditProcessingService {
 
     public void trySubmitIfThresholdMet() {
         if (transactionQueue.size() >= SUBMISSION_LIMIT && submitting.compareAndSet(false, true)) {
+            logger.info("Audit threshold met. Starting audit cycle.");
             new Thread(this::runAuditCycle).start();
         }
     }
@@ -53,8 +58,9 @@ public class AuditProcessingService {
             notifier.submit(batches);
 
             auditBatchPersistence.markSubmitted(batchId);
+            logger.info("Audit batch {} submitted successfully with {} transactions.", batchId, drained.size());
         } catch (Exception e) {
-            System.err.println("⚠️ Audit cycle failed: " + e.getMessage());
+            logger.error("Audit cycle failed: {}", e.getMessage(), e);
         } finally {
             submitting.set(false);
         }
