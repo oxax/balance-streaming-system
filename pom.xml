@@ -8,11 +8,13 @@
         <version>3.5.3</version>
         <relativePath/>
     </parent>
-    <groupId>com.jpc.exercise</groupId>
+    
+    <groupId>com.arctiq.liquidity.balsys</groupId>
     <artifactId>balance-streaming-system</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0-SNAPSHOT</version>
     <name>Balance Streaming System</name>
-    <description>A latency-sensitive Java engine for real-time transaction ingestion and audit batching</description>
+    <description>High-Throughput, Low-Latency Transaction Engine for auditing and balance tracking</description>
+
     <url/>
     <licenses>
         <license/>
