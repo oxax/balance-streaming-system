@@ -49,8 +49,8 @@ class BatchingAlgorithmTest {
         List<AuditBatch> batches = algorithm.groupIntoBatches(txs);
 
         for (AuditBatch batch : batches) {
-            long total = batch.getTransactions().stream()
-                    .mapToLong(tx -> Math.abs(tx.getAmount()))
+            Double total = batch.getTransactions().stream()
+                    .mapToDouble(tx -> Math.abs(tx.getAmount()))
                     .sum();
 
             assertTrue(total <= 1_000_000L, "Batch total exceeds £1,000,000");

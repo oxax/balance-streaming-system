@@ -21,9 +21,9 @@ public class AuditBatch {
         return transactions;
     }
 
-    public long getTotalValue() {
+    public double getTotalValue() {
         return transactions.stream()
-                .mapToLong(tx -> Math.abs(tx.getAmount()))
+                .mapToDouble(tx -> Math.abs(tx.getAmount()))
                 .sum();
     }
 

@@ -18,7 +18,7 @@ import com.jpc.exercise.shared.audit.AuditNotifier;
 public class AuditProcessingService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuditProcessingService.class);
-    private static final int SUBMISSION_LIMIT = 1000;
+    // private static final int SUBMISSION_LIMIT = 1000;
 
     private final LinkedTransferQueue<Transaction> transactionQueue;
     private final BatchingAlgorithm batchingAlgorithm;
@@ -26,19 +26,23 @@ public class AuditProcessingService {
     private final AuditBatchPersistence auditBatchPersistence;
     private final AtomicBoolean submitting = new AtomicBoolean(false);
 
+    private final int submissionLimit;
+
     public AuditProcessingService(
             LinkedTransferQueue<Transaction> transactionQueue,
             BatchingAlgorithm batchingAlgorithm,
             AuditNotifier notifier,
-            AuditBatchPersistence auditBatchPersistence) {
+            AuditBatchPersistence auditBatchPersistence, int submissionLimit) {
         this.transactionQueue = transactionQueue;
         this.batchingAlgorithm = batchingAlgorithm;
         this.notifier = notifier;
         this.auditBatchPersistence = auditBatchPersistence;
+        this.submissionLimit = submissionLimit;
+        logger.info("AuditProcessingService initialized with submission limit: {}", submissionLimit);
     }
 
     public void trySubmitIfThresholdMet() {
-        if (transactionQueue.size() >= SUBMISSION_LIMIT && submitting.compareAndSet(false, true)) {
+        if (transactionQueue.size() >= submissionLimit && submitting.compareAndSet(false, true)) {
             logger.info("Audit threshold met. Starting audit cycle.");
             new Thread(this::runAuditCycle).start();
         }
@@ -47,7 +51,9 @@ public class AuditProcessingService {
     public void runAuditCycle() {
         try {
             List<Transaction> drained = new ArrayList<>();
-            transactionQueue.drainTo(drained, SUBMISSION_LIMIT);
+            logger.info("Draining transactions from queue for audit submission.");
+            // Drain transactions from the queue up to the submission limit
+            transactionQueue.drainTo(drained, submissionLimit);
 
             if (drained.isEmpty()) return;
 

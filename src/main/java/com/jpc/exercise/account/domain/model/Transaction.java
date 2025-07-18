@@ -1,5 +1,6 @@
 package com.jpc.exercise.account.domain.model;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.random.RandomGenerator;
 
@@ -8,24 +9,31 @@ import com.jpc.exercise.exception.TransactionValidationException;
 public class Transaction {
 
     private final String id;
-    private final long amount;
+    private final double amount;
+    private final Instant timestamp;
 
-    private static final long MIN_AMOUNT = 200L;
-    private static final long MAX_AMOUNT = 500_000L;
-
-
+    private static final double MIN_AMOUNT = 200.0;
+    private static final double MAX_AMOUNT = 500_000.0;
 
     /**
      * Constructs a Transaction with random ID and validated amount.
      */
-    public Transaction(RandomGenerator generator, long amount) {
-        this(generateId(generator), amount);
+    public Transaction(RandomGenerator generator, double amount) {
+        this(generateId(generator), amount, Instant.now());
     }
 
     /**
      * Constructs a Transaction with provided ID and amount.
      */
-    public Transaction(String id, long amount) {
+    public Transaction(String id, double amount) {
+        this(id, amount, Instant.now());
+    }
+
+    /**
+     * Constructs a Transaction with provided ID, amount, and timestamp.
+     * Used internally to ensure timestamp is always set at creation.
+     */
+    private Transaction(String id, double amount, Instant timestamp) {
         if (id == null || id.isBlank()) {
             throw new TransactionValidationException("Transaction ID cannot be null or blank");
         }
@@ -34,10 +42,11 @@ public class Transaction {
         }
         this.id = id;
         this.amount = amount;
+        this.timestamp = timestamp;
     }
 
-    private static boolean isValidAmount(long value) {
-        long abs = Math.abs(value);
+    private static boolean isValidAmount(double value) {
+        double abs = Math.abs(value);
         return abs >= MIN_AMOUNT && abs <= MAX_AMOUNT;
     }
 
@@ -49,8 +58,12 @@ public class Transaction {
         return id;
     }
 
-    public long getAmount() {
+    public double getAmount() {
         return amount;
+    }
+
+    public Instant getTimestamp() {
+        return timestamp;
     }
 
     public boolean isCredit() {
@@ -63,18 +76,20 @@ public class Transaction {
 
     @Override
     public String toString() {
-        return "Transaction{id='" + id + "', amount=" + amount + '}';
+        return "Transaction{id='" + id + "', amount=" + amount + ", timestamp=" + timestamp + '}';
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Transaction tx)) return false;
-        return amount == tx.amount && id.equals(tx.id);
+        return Double.compare(tx.amount, amount) == 0
+                && id.equals(tx.id)
+                && timestamp.equals(tx.timestamp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, amount);
+        return Objects.hash(id, amount, timestamp);
     }
 }

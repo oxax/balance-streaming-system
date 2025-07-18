@@ -36,7 +36,7 @@ class AuditFlowIntegrationTest {
         AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
 
         BankAccountService accountService = new BankAccountServiceImpl(queue);
-        AuditProcessingService auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), spyNotifier, persistence);
+        AuditProcessingService auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), spyNotifier, persistence, 1000);
 
         for (int i = 0; i < 1000; i++) {
             accountService.processTransaction(new Transaction(generator, 250_000L));

@@ -1,6 +1,7 @@
 package com.jpc.exercise.audit.domain.service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,32 +10,41 @@ import com.jpc.exercise.audit.domain.model.AuditBatch;
 
 public class BatchingAlgorithm {
 
-    private static final long MAX_BATCH_TOTAL = 1_000_000L;
+    private static final double MAX_BATCH_TOTAL = 1_000_000;
 
     public List<AuditBatch> groupIntoBatches(List<Transaction> transactions) {
-        List<Transaction> sorted = new ArrayList<>(transactions);
-        sorted.sort((a, b) -> Long.compare(Math.abs(b.getAmount()), Math.abs(a.getAmount())));
+        List<AuditBatch> auditBatches = new ArrayList<>();
+        List<List<Transaction>> rawBatches = new ArrayList<>();
 
-        List<AuditBatch> batches = new ArrayList<>();
-        List<Transaction> current = new ArrayList<>();
-        long currentTotal = 0;
+        List<Transaction> sorted = transactions.stream()
+                .sorted(Comparator.comparingDouble(t -> -Math.abs(t.getAmount())))
+                .toList();
 
         for (Transaction tx : sorted) {
-            long absAmount = Math.abs(tx.getAmount());
-            if (currentTotal + absAmount <= MAX_BATCH_TOTAL) {
-                current.add(tx);
-                currentTotal += absAmount;
-            } else {
-                batches.add(new AuditBatch(UUID.randomUUID().toString(), current));
-                current = new ArrayList<>(List.of(tx));
-                currentTotal = absAmount;
+            boolean placed = false;
+            for (List<Transaction> batch : rawBatches) {
+                double batchTotal = batch.stream()
+                        .mapToDouble(t -> Math.abs(t.getAmount()))
+                        .sum();
+                if (batchTotal + Math.abs(tx.getAmount()) <= MAX_BATCH_TOTAL) {
+                    batch.add(tx);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                List<Transaction> newBatch = new ArrayList<>();
+                newBatch.add(tx);
+                rawBatches.add(newBatch);
             }
         }
 
-        if (!current.isEmpty()) {
-            batches.add(new AuditBatch(UUID.randomUUID().toString(), current));
+        for (List<Transaction> batch : rawBatches) {
+            String batchId = UUID.randomUUID().toString();
+            auditBatches.add(new AuditBatch(batchId, batch));
         }
 
-        return batches;
+        return auditBatches;
     }
+
 }

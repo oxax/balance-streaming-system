@@ -18,6 +18,7 @@ import com.jpc.exercise.audit.domain.service.BatchingAlgorithm;
 import com.jpc.exercise.audit.infrastructure.persistence.AuditBatchPersistence;
 import com.jpc.exercise.audit.infrastructure.persistence.InMemoryAuditBatchStore;
 import com.jpc.exercise.shared.audit.AuditNotifier;
+import com.jpc.exercise.shared.observability.MetricsCollector;
 
 class AuditProcessingServiceTest {
 
@@ -30,6 +31,8 @@ class AuditProcessingServiceTest {
     private LoggingAuditNotifier notifier;
     private RandomGenerator generator;
     private AuditBatchPersistence persistence;
+    private MetricsCollector metricsCollector;
+
 
     @BeforeEach
     void setup() {
@@ -37,7 +40,8 @@ class AuditProcessingServiceTest {
         generator = RandomGenerator.getDefault();
         notifier = new LoggingAuditNotifier(); // now logs batch details
         persistence = new InMemoryAuditBatchStore();
-        auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), notifier, persistence);
+        metricsCollector = new MetricsCollector(); // Initialize metrics collector
+        auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), notifier, persistence, SUBMISSION_SIZE);
     }
 
     @Test
@@ -57,17 +61,17 @@ class AuditProcessingServiceTest {
         assertEquals(SUBMISSION_SIZE, totalSubmittedTx, "Mismatch in submitted transaction count");
 
         for (AuditBatch batch : notifier.submittedBatches) {
-            long batchTotal = batch.getTransactions().stream()
-                                   .mapToLong(tx -> Math.abs(tx.getAmount()))
+            Double batchTotal = batch.getTransactions().stream()
+                                   .mapToDouble(tx -> Math.abs(tx.getAmount()))
                                    .sum();
-            assertTrue(batchTotal <= 1_000_000L, "Batch violates max £1M constraint");
+            assertTrue(batchTotal <= 1_000_000D, "Batch violates max £1M constraint");
         }
     }
 
     private Transaction generateRandomTransaction() {
-        long amount = MIN_AMOUNT + (long) (generator.nextDouble() * (MAX_AMOUNT - MIN_AMOUNT));
+        double amount = MIN_AMOUNT + (generator.nextDouble() * (MAX_AMOUNT - MIN_AMOUNT));
         boolean isCredit = generator.nextBoolean();
-        long signedAmount = isCredit ? amount : -amount;
+        long signedAmount = isCredit ? (long) amount : -(long) amount;
         return new Transaction(generator, signedAmount);
     }
 
@@ -83,8 +87,8 @@ class AuditProcessingServiceTest {
 
             System.out.println("Audit Submission Report:");
             for (AuditBatch batch : batches) {
-                long totalValue = batch.getTransactions().stream()
-                                       .mapToLong(tx -> Math.abs(tx.getAmount()))
+                Double totalValue = batch.getTransactions().stream()
+                                       .mapToDouble(tx -> Math.abs(tx.getAmount()))
                                        .sum();
 
                 System.out.printf(" - Batch ID: %s | Tx Count: %d | Total Value: £%,d%n",
