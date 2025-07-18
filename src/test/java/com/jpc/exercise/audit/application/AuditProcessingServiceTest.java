@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import com.jpc.exercise.account.domain.model.Transaction;
 import com.jpc.exercise.audit.domain.model.AuditBatch;
 import com.jpc.exercise.audit.domain.service.BatchingAlgorithm;
+import com.jpc.exercise.audit.infrastructure.persistence.AuditBatchPersistence;
+import com.jpc.exercise.audit.infrastructure.persistence.InMemoryAuditBatchStore;
 import com.jpc.exercise.shared.audit.AuditNotifier;
 
 class AuditProcessingServiceTest {
@@ -27,13 +29,15 @@ class AuditProcessingServiceTest {
     private LinkedTransferQueue<Transaction> queue;
     private LoggingAuditNotifier notifier;
     private RandomGenerator generator;
+    private AuditBatchPersistence persistence;
 
     @BeforeEach
     void setup() {
         queue = new LinkedTransferQueue<>();
         generator = RandomGenerator.getDefault();
         notifier = new LoggingAuditNotifier(); // now logs batch details
-        auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), notifier);
+        persistence = new InMemoryAuditBatchStore();
+        auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), notifier, persistence);
     }
 
     @Test
@@ -43,7 +47,7 @@ class AuditProcessingServiceTest {
             queue.offer(generateRandomTransaction());
         }
 
-        auditService.processNextBatch();
+        auditService.trySubmitIfThresholdMet();
 
         int totalSubmittedTx = notifier.submittedBatches.stream()
                                     .mapToInt(batch -> batch.getTransactions().size())

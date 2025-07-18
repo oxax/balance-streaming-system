@@ -1,13 +1,11 @@
 package com.jpc.exercise.account.domain.model;
 
-import java.util.UUID;
 import java.util.random.RandomGenerator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +28,7 @@ class TransactionTest {
         long amount = 300_000L;
         Transaction tx = new Transaction(generator, amount);
 
-        assertEquals(generator, tx.getId());
+        assertTrue(tx.getId() != null && !tx.getId().isEmpty());
         assertEquals(300_000L, tx.getAmount());
         assertTrue(tx.isCredit());
         assertFalse(tx.isDebit());

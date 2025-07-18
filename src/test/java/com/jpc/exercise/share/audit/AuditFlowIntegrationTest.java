@@ -16,11 +16,14 @@ import com.jpc.exercise.account.domain.model.Transaction;
 import com.jpc.exercise.audit.application.AuditProcessingService;
 import com.jpc.exercise.audit.domain.model.AuditBatch;
 import com.jpc.exercise.audit.domain.service.BatchingAlgorithm;
+import com.jpc.exercise.audit.infrastructure.persistence.AuditBatchPersistence;
+import com.jpc.exercise.audit.infrastructure.persistence.InMemoryAuditBatchStore;
 import com.jpc.exercise.shared.audit.AuditNotifier;
 
 class AuditFlowIntegrationTest {
 
     private RandomGenerator generator;
+
     @BeforeEach
     void setup() {
         generator = RandomGenerator.getDefault();
@@ -29,26 +32,24 @@ class AuditFlowIntegrationTest {
     @Test
     void shouldTriggerAuditAfter1000Transactions() {
         LinkedTransferQueue<Transaction> queue = new LinkedTransferQueue<>();
-
-        // Spy notifier to inspect submission
         SpyAuditNotifier spyNotifier = new SpyAuditNotifier();
+        AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
 
         BankAccountService accountService = new BankAccountServiceImpl(queue);
-        AuditProcessingService auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), spyNotifier);
+        AuditProcessingService auditService = new AuditProcessingService(queue, new BatchingAlgorithm(), spyNotifier, persistence);
 
-        // Simulate pushing 1000 transactions
         for (int i = 0; i < 1000; i++) {
             accountService.processTransaction(new Transaction(generator, 250_000L));
         }
 
-        // Trigger batch processing
         auditService.runAuditCycle();
 
-        // Verify batches were submitted
         assertFalse(spyNotifier.submittedBatches.isEmpty(), "Audit submission should have occurred");
+
         int totalTx = spyNotifier.submittedBatches.stream()
-                          .mapToInt(batch -> batch.getTransactions().size())
-                          .sum();
+                .mapToInt(batch -> batch.getTransactions().size())
+                .sum();
+
         assertEquals(1000, totalTx, "Total transactions batched should be 1000");
     }
 
