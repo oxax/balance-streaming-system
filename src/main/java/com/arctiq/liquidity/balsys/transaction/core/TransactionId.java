@@ -4,6 +4,11 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.random.RandomGenerator;
 
+import com.arctiq.liquidity.balsys.transaction.transport.serialization.TransactionIdSerializer;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+@JsonSerialize(using = TransactionIdSerializer.class)
 public final class TransactionId {
 
     private static final AtomicLong counter = new AtomicLong(1);
@@ -25,6 +30,7 @@ public final class TransactionId {
         return value;
     }
 
+    @JsonValue
     @Override
     public String toString() {
         return "TX-" + value;
