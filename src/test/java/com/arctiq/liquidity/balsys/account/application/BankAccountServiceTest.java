@@ -1,38 +1,45 @@
 package com.arctiq.liquidity.balsys.account.application;
 
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
+import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
+import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+import com.arctiq.liquidity.balsys.transaction.core.TransactionId;
+
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedTransferQueue;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
-import com.arctiq.liquidity.balsys.account.domain.model.TransactionId;
-import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
-import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
-import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import static org.junit.jupiter.api.Assertions.*;
 
 class BankAccountServiceTest {
 
     private BankAccountService service;
     private LinkedTransferQueue<Transaction> queue;
+    private TransactionConfigProperties config;
+    private MetricsCollector metrics;
 
     @BeforeEach
     void setup() {
+        config = AuditTestFixtures.config();
         queue = new LinkedTransferQueue<>();
-        service = new BankAccountServiceImpl(queue, new TransactionConfigProperties());
+        metrics = new MetricsCollector(new SimpleMeterRegistry());
+        service = new BankAccountServiceImpl(queue, config, metrics);
     }
 
     @Test
     @DisplayName("Processes single credit correctly")
     void shouldProcessSingleCredit() {
-        Transaction tx = new Transaction(TransactionId.generate(), Money.of(300_000.0));
+        Transaction tx = AuditTestFixtures.fixedTransaction(300_000.0);
         service.processTransaction(tx);
 
         assertEquals(300_000.0, service.retrieveBalance());
@@ -42,7 +49,7 @@ class BankAccountServiceTest {
     @Test
     @DisplayName("Processes single debit correctly")
     void shouldProcessSingleDebit() {
-        Transaction tx = new Transaction(TransactionId.generate(), Money.of(-200_000.0));
+        Transaction tx = AuditTestFixtures.fixedTransaction(-200_000.0);
         service.processTransaction(tx);
 
         assertEquals(-200_000.0, service.retrieveBalance());
@@ -52,9 +59,9 @@ class BankAccountServiceTest {
     @Test
     @DisplayName("Accumulates multiple transactions accurately")
     void shouldAccumulateMultipleTransactions() {
-        service.processTransaction(new Transaction(TransactionId.generate(), Money.of(400_000.0)));
-        service.processTransaction(new Transaction(TransactionId.generate(), Money.of(-250_000.0)));
-        service.processTransaction(new Transaction(TransactionId.generate(), Money.of(100_000.0)));
+        service.processTransaction(AuditTestFixtures.fixedTransaction(400_000.0));
+        service.processTransaction(AuditTestFixtures.fixedTransaction(-250_000.0));
+        service.processTransaction(AuditTestFixtures.fixedTransaction(100_000.0));
 
         double expectedBalance = 400_000.0 - 250_000.0 + 100_000.0;
         assertEquals(expectedBalance, service.retrieveBalance());
@@ -70,7 +77,7 @@ class BankAccountServiceTest {
 
         for (int i = 0; i < threads; i++) {
             executor.execute(() -> {
-                Transaction tx = new Transaction(TransactionId.generate(), Money.of(10_000.0));
+                Transaction tx = AuditTestFixtures.fixedTransaction(10_000.0);
                 service.processTransaction(tx);
                 latch.countDown();
             });
@@ -80,23 +87,23 @@ class BankAccountServiceTest {
         executor.shutdown();
 
         assertEquals(threads * 10_000.0, service.retrieveBalance());
-        assertEquals(100, queue.size());
+        assertEquals(threads, queue.size());
     }
 
     @Test
     @DisplayName("Rejects null transaction input")
     void shouldRejectNullTransaction() {
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+        IllegalArgumentException thrown = assertThrows(
+                IllegalArgumentException.class,
                 () -> service.processTransaction(null));
+
         assertEquals("Transaction must not be null", thrown.getMessage());
     }
 
     @Test
     @DisplayName("Rejects transaction outside valid range")
     void shouldRejectInvalidAmount() {
-        Money invalidAmount = Money.of(199.0);
-        Transaction tx = new Transaction(TransactionId.generate(), invalidAmount);
-
+        Transaction tx = new Transaction(TransactionId.generate(), Money.of(199.0));
         TransactionValidationException thrown = assertThrows(
                 TransactionValidationException.class,
                 () -> service.processTransaction(tx));

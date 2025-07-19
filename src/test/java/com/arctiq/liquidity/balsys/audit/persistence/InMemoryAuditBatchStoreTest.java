@@ -9,9 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
-import com.arctiq.liquidity.balsys.account.domain.model.TransactionId;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+import com.arctiq.liquidity.balsys.transaction.core.TransactionId;
 
 class InMemoryAuditBatchStoreTest {
 

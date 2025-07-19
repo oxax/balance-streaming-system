@@ -14,5 +14,4 @@ public class LocalAuditNotifier implements AuditNotifier {
                     + " transactions.");
         }
     }
-
 }

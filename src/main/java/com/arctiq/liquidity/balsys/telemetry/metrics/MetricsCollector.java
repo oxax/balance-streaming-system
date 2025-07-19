@@ -11,8 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
 import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionAccepted;
+import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionOutcome;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -44,7 +46,7 @@ public class MetricsCollector {
 
     public void updateQueueSize(int size) {
         queueSize.set(size);
-        logger.info("Queue size updated: {}", size);
+        logger.debug("Queue size updated: {}", size);
     }
 
     public void incrementDropped(Transaction tx) {
@@ -108,5 +110,22 @@ public class MetricsCollector {
                 "mean", mean,
                 "max", max,
                 "p95", p95);
+    }
+
+    public void recordTransactionOutcome(TransactionOutcome outcome) {
+        String type = outcome instanceof TransactionAccepted ? "Accepted" : "Invalid";
+        logger.debug("Transaction outcome [{}] at {} | Amount: {} | ID: {}",
+                type,
+                Instant.now(),
+                null != outcome.transaction() ? outcome.transaction().amount().amount() : "N/A",
+                null != outcome.transaction() ? outcome.transaction().id().value() : "N/A");
+    }
+
+    public void logRuntimeMetrics() {
+        logger.info("🧮 Metrics Snapshot [{}]", Instant.now());
+        logger.info(" - Queue Size: {}", getCurrentQueueSize());
+        logger.info(" - Dropped Tx: {}", getDroppedTxCount());
+        getLatencySnapshot()
+                .forEach((k, v) -> logger.info(" - Audit Latency [{}]: {} ms", k, String.format("%.2f", v)));
     }
 }

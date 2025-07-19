@@ -6,7 +6,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
+import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
+import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 
 public class InMemoryAuditBatchStore implements AuditBatchPersistence {
 
@@ -48,5 +50,29 @@ public class InMemoryAuditBatchStore implements AuditBatchPersistence {
                 pending.add(entry.getKey());
         }
         return pending;
+    }
+
+    @Override
+    public List<AuditBatch> fetchAll() {
+        List<AuditBatch> allBatches = new ArrayList<>();
+
+        for (Map.Entry<String, StoredBatch> entry : store.entrySet()) {
+            String batchId = entry.getKey();
+            StoredBatch stored = entry.getValue();
+
+            double totalAmount = stored.transactions.stream()
+                    .mapToDouble(tx -> tx.amount().amount().doubleValue())
+                    .sum();
+
+            AuditBatch batch = new AuditBatch(batchId, stored.transactions, Money.of(totalAmount));
+            allBatches.add(batch);
+        }
+
+        return allBatches;
+    }
+
+    @Override
+    public void clear() {
+        store.clear();
     }
 }

@@ -1,22 +1,14 @@
 package com.arctiq.liquidity.balsys.audit.domain;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 
-public class AuditBatch {
-
+public final class AuditBatch {
     private final String batchId;
-    private List<Transaction> transactions = new ArrayList<>();
-    private Money totalValue = Money.of(0.0);
-    // private static final Money VALUE_LIMIT = Money.of(1_000_000.0);
-    // public AuditBatch(String batchId) {
-    // this.batchId = batchId;
-    // }
-
+    private final List<Transaction> transactions;
+    private final Money totalValue;
     private final Money valueLimit;
 
     public AuditBatch(String batchId, List<Transaction> transactions, Money valueLimit) {
@@ -26,21 +18,22 @@ public class AuditBatch {
                 .map(Transaction::absoluteValue)
                 .reduce(Money.of(0.0), Money::add);
         this.valueLimit = valueLimit;
+
+        if (this.totalValue.amount().compareTo(valueLimit.amount()) > 0) {
+            throw new IllegalStateException("Batch exceeds maximum allowed value");
+        }
     }
 
-    public boolean canAccept(Transaction tx) {
-        return totalValue.add(tx.absoluteValue()).amount().compareTo(valueLimit.amount()) <= 0;
+    public boolean isWithinLimit() {
+        return totalValue.amount().compareTo(valueLimit.amount()) <= 0;
     }
 
-    // public void add(Transaction tx) {
-    // if (!canAccept(tx))
-    // throw new IllegalStateException("Batch limit exceeded");
-    // transactions.add(tx);
-    // totalValue = totalValue.add(tx.absoluteValue());
-    // }
+    public String getBatchId() {
+        return batchId;
+    }
 
     public List<Transaction> getTransactions() {
-        return Collections.unmodifiableList(transactions);
+        return transactions;
     }
 
     public Money getTotalValue() {
@@ -51,7 +44,13 @@ public class AuditBatch {
         return transactions.size();
     }
 
-    public String getBatchId() {
-        return batchId;
+    @Override
+    public String toString() {
+        return String.format("AuditBatch[id=%s, txCount=%d, totalValue=%.2f, valueLimit=%.2f, withinLimit=%s]",
+                batchId,
+                getTransactionCount(),
+                totalValue.amount().doubleValue(),
+                valueLimit.amount().doubleValue(),
+                isWithinLimit());
     }
 }

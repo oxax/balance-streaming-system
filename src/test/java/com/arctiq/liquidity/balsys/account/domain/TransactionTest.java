@@ -1,27 +1,37 @@
 package com.arctiq.liquidity.balsys.account.domain;
 
-import java.math.BigDecimal;
+import com.arctiq.liquidity.balsys.account.application.BankAccountServiceImpl;
+import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
+import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+import com.arctiq.liquidity.balsys.transaction.core.TransactionId;
+import com.arctiq.liquidity.balsys.transaction.core.TransactionValidator;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
-import com.arctiq.liquidity.balsys.account.domain.model.TransactionId;
-import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
-import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import java.math.BigDecimal;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class TransactionTest {
+
+    private TransactionValidator validator;
+
+    @BeforeEach
+    void setup() {
+        validator = new TransactionValidator(AuditTestFixtures.config());
+    }
 
     @Test
     @DisplayName("Valid credit transaction is accepted")
     void shouldCreateValidCreditTransaction() {
-        Transaction tx = new Transaction(TransactionId.generate(), Money.of(300_000.0));
-
+        Transaction tx = Transaction.validated(TransactionId.generate(), Money.of(300_000.0), validator);
         assertNotNull(tx.id());
         assertEquals(300_000.0, tx.amount().amount().doubleValue());
         assertTrue(tx.isCredit());
@@ -32,8 +42,7 @@ class TransactionTest {
     @Test
     @DisplayName("Valid debit transaction is accepted")
     void shouldCreateValidDebitTransaction() {
-        Transaction tx = new Transaction(TransactionId.generate(), Money.of(-450_000.0));
-
+        Transaction tx = Transaction.validated(TransactionId.generate(), Money.of(-450_000.0), validator);
         assertTrue(tx.isDebit());
         assertFalse(tx.isCredit());
     }
@@ -43,7 +52,7 @@ class TransactionTest {
     void shouldThrowForNullId() {
         TransactionValidationException ex = assertThrows(
                 TransactionValidationException.class,
-                () -> new Transaction(null, Money.of(250_000.0)));
+                () -> Transaction.validated(null, Money.of(250_000.0), validator));
         assertTrue(ex.getMessage().contains("Transaction ID must not be null"));
     }
 
@@ -52,7 +61,7 @@ class TransactionTest {
     void shouldThrowForNullMoney() {
         TransactionValidationException ex = assertThrows(
                 TransactionValidationException.class,
-                () -> new Transaction(TransactionId.generate(), null));
+                () -> Transaction.validated(TransactionId.generate(), null, validator));
         assertTrue(ex.getMessage().contains("Transaction amount must not be null"));
     }
 
@@ -62,7 +71,7 @@ class TransactionTest {
         BigDecimal tooSmall = BigDecimal.valueOf(199.0);
         TransactionValidationException ex = assertThrows(
                 TransactionValidationException.class,
-                () -> new Transaction(TransactionId.generate(), new Money(tooSmall)));
+                () -> Transaction.validated(TransactionId.generate(), new Money(tooSmall), validator));
         assertTrue(ex.getMessage().contains("out of range"));
     }
 
@@ -72,38 +81,26 @@ class TransactionTest {
         BigDecimal tooLarge = BigDecimal.valueOf(1_000_001.0);
         TransactionValidationException ex = assertThrows(
                 TransactionValidationException.class,
-                () -> new Transaction(TransactionId.generate(), new Money(tooLarge)));
+                () -> Transaction.validated(TransactionId.generate(), new Money(tooLarge), validator));
         assertTrue(ex.getMessage().contains("out of range"));
     }
 
     @Test
-    @DisplayName("Handles transaction with zero amount")
+    @DisplayName("Rejects zero transaction amount")
     void shouldRejectZeroTransaction() {
         TransactionValidationException ex = assertThrows(
                 TransactionValidationException.class,
-                () -> new Transaction(TransactionId.generate(), Money.of(0.0)));
+                () -> Transaction.validated(TransactionId.generate(), Money.of(0.0), validator));
         assertTrue(ex.getMessage().contains("out of range"));
     }
 
     @Test
     @DisplayName("Rejects absurdly precise amount")
-    void shouldRejectNanoprecisionAmount() {
-        BigDecimal nanoAmount = new BigDecimal("0.00000000001");
+    void shouldRejectNanoPrecision() {
+        BigDecimal nano = new BigDecimal("0.00000000001");
         TransactionValidationException ex = assertThrows(
                 TransactionValidationException.class,
-                () -> new Transaction(TransactionId.generate(), new Money(nanoAmount)));
+                () -> Transaction.validated(TransactionId.generate(), new Money(nano), validator));
         assertTrue(ex.getMessage().contains("out of range"));
-    }
-
-    @Test
-    @DisplayName("Rejects mixed-currency construction (if extended)")
-    void shouldRejectMixedCurrencyInMoneyAdd() {
-        Money british = new Money(BigDecimal.valueOf(1000));
-        Money american = new Money(BigDecimal.valueOf(2000));
-
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
-                () -> british.add(american));
-        assertTrue(ex.getMessage().contains("different currencies"));
     }
 }

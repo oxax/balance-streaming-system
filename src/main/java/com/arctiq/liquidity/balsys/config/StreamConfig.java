@@ -9,11 +9,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.arctiq.liquidity.balsys.account.application.BankAccountService;
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
 import com.arctiq.liquidity.balsys.producer.channel.CreditProducer;
 import com.arctiq.liquidity.balsys.producer.channel.DebitProducer;
 import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
 import com.arctiq.liquidity.balsys.producer.orchestration.TransactionProducerOrchestrator;
+import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+
+import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration
 public class StreamConfig {
@@ -39,13 +42,14 @@ public class StreamConfig {
             DebitProducer debitProducer,
             BankAccountService accountService,
             LinkedTransferQueue<Transaction> transactionQueue,
-            ExecutorService auditExecutor) {
+            ExecutorService auditExecutor, MeterRegistry meterRegistry,
+            MetricsCollector metricsCollector) {
         return new TransactionProducerOrchestrator(
                 creditProducer,
                 debitProducer,
                 accountService,
                 transactionQueue,
-                auditExecutor);
+                auditExecutor, meterRegistry, metricsCollector);
     }
 
     @Bean

@@ -1,17 +1,23 @@
 package com.arctiq.liquidity.balsys.producer.orchestration;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedTransferQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
+import com.arctiq.liquidity.balsys.account.application.BankAccountService;
+import com.arctiq.liquidity.balsys.producer.channel.TransactionProducer;
+import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
+import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionInvalid;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.arctiq.liquidity.balsys.account.application.BankAccountService;
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
-import com.arctiq.liquidity.balsys.producer.channel.TransactionProducer;
-import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 public class TransactionProducerOrchestrator {
 
@@ -22,47 +28,82 @@ public class TransactionProducerOrchestrator {
     private final BankAccountService accountService;
     private final LinkedTransferQueue<Transaction> queue;
     private final ExecutorService executor;
+    private final MetricsCollector metricsCollector;
+
+    private final Counter producedCounter;
+    private final Counter submittedCounter;
+    private final AtomicInteger currentEmissionRate = new AtomicInteger(0);
 
     public TransactionProducerOrchestrator(
             TransactionProducer creditProducer,
             TransactionProducer debitProducer,
             BankAccountService accountService,
             LinkedTransferQueue<Transaction> queue,
-            ExecutorService executor) {
+            ExecutorService executor,
+            MeterRegistry meterRegistry,
+            MetricsCollector metricsCollector) {
+
         this.creditProducer = creditProducer;
         this.debitProducer = debitProducer;
         this.accountService = accountService;
         this.queue = queue;
         this.executor = executor;
+        this.metricsCollector = metricsCollector;
+
+        this.producedCounter = Counter.builder("transactions.produced.total")
+                .description("Total transactions produced")
+                .register(meterRegistry);
+
+        this.submittedCounter = Counter.builder("transactions.submitted.total")
+                .description("Total transactions submitted to BankAccountService")
+                .register(meterRegistry);
+
+        meterRegistry.gauge("transactions.emission.rate", currentEmissionRate);
     }
 
-    public void startEmitLoops(ProducerConfig config) {
-        logger.info("Starting transaction emission: {} transactions per stream over {} seconds.",
-                config.count(), config.intervalSeconds());
-        executor.submit(() -> emitLoop(creditProducer, config));
-        executor.submit(() -> emitLoop(debitProducer, config));
+    public void startEmitLoops(ProducerConfig producerConfig) {
+        logger.info("Starting emission: {} tx/stream every {}s", producerConfig.count(),
+                producerConfig.intervalSeconds());
+
+        executor.submit(() -> emitLoop(creditProducer, producerConfig));
+        executor.submit(() -> emitLoop(debitProducer, producerConfig));
     }
 
-    private void emitLoop(TransactionProducer producer, ProducerConfig config) {
-        long spacingNanos = TimeUnit.SECONDS.toNanos(config.intervalSeconds()) / config.count();
+    private void emitLoop(TransactionProducer producer, ProducerConfig producerConfig) {
+        long spacingNanos = TimeUnit.SECONDS.toNanos(producerConfig.intervalSeconds()) / producerConfig.count();
         long nextTick = System.nanoTime();
+        logger.debug("ProducerConfig state: count={}, intervalSeconds={}",
+                producerConfig.count(), producerConfig.intervalSeconds());
 
-        try {
-            for (int i = 0; i < config.count(); i++) {
+        int successfulEmissions = 0;
+
+        for (int i = 0; i < producerConfig.count(); i++) {
+            try {
                 Transaction tx = producer.produce();
-                accountService.processTransaction(tx);
-                queue.offer(tx);
+                producedCounter.increment();
+                currentEmissionRate.incrementAndGet();
 
-                nextTick += spacingNanos;
-                long sleepTime = nextTick - System.nanoTime();
-                if (sleepTime > 0) {
-                    LockSupport.parkNanos(sleepTime);
-                }
+                accountService.processTransaction(tx);
+                submittedCounter.increment();
+                metricsCollector.recordTransaction(tx);
+
+                successfulEmissions++;
+
+            } catch (Exception ex) {
+                logger.warn("Transaction emission failed on iteration {}: {}", i, ex.getMessage(), ex);
+                metricsCollector.recordTransactionOutcome(new TransactionInvalid(null, ex.getMessage()));
             }
-            logger.info("Emission completed for producer: {}", producer.getClass().getSimpleName());
-        } catch (Exception e) {
-            logger.error("Transaction emission failed for producer {}: {}", producer.getClass().getSimpleName(),
-                    e.getMessage(), e);
+
+            nextTick += spacingNanos;
+            long sleepTime = nextTick - System.nanoTime();
+            if (sleepTime > 0) {
+                LockSupport.parkNanos(sleepTime);
+            }
         }
+
+        logger.info("Emission completed for producer: {}. Successful emissions: {}",
+                producer.getClass().getSimpleName(), successfulEmissions);
+
+        currentEmissionRate.set(0);
     }
 }

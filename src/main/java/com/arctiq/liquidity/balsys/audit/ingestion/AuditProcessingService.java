@@ -1,28 +1,21 @@
 package com.arctiq.liquidity.balsys.audit.ingestion;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
+import com.arctiq.liquidity.balsys.audit.grouping.BatchingAlgorithm;
+import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
+import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
+import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+
+import io.micrometer.core.instrument.Timer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
-import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
-import com.arctiq.liquidity.balsys.audit.grouping.BatchingAlgorithm;
-import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
-import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
-import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
-
-import io.micrometer.core.instrument.Timer;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AuditProcessingService {
 
@@ -38,41 +31,40 @@ public class AuditProcessingService {
     private final ScheduledExecutorService scheduler;
 
     private final int submissionLimit;
-    private final int queueCapacity;
-    private final long flushIntervalMillis;
     private final AtomicBoolean submitting = new AtomicBoolean(false);
 
     public AuditProcessingService(
-            int queueCapacity,
-            int submissionLimit,
-            long flushIntervalMillis,
-            int auditThreads,
+            BlockingQueue<Transaction> transactionQueue,
+            TransactionConfigProperties config,
             BatchingAlgorithm batchingAlgorithm,
             AuditNotifier notifier,
             AuditBatchPersistence auditBatchPersistence,
             MetricsCollector metrics) {
 
-        this.queueCapacity = queueCapacity;
-        this.submissionLimit = submissionLimit;
-        this.flushIntervalMillis = flushIntervalMillis;
+        this.transactionQueue = transactionQueue;
+        this.submissionLimit = config.getSubmissionLimit();
         this.batchingAlgorithm = batchingAlgorithm;
         this.notifier = notifier;
         this.auditBatchPersistence = auditBatchPersistence;
         this.metrics = metrics;
 
-        this.transactionQueue = new ArrayBlockingQueue<>(queueCapacity);
-        this.auditExecutor = Executors.newFixedThreadPool(auditThreads);
+        this.auditExecutor = Executors.newFixedThreadPool(config.getAuditThreads());
         this.scheduler = Executors.newScheduledThreadPool(1);
 
-        scheduler.scheduleAtFixedRate(this::flushDueToTimeout, flushIntervalMillis, flushIntervalMillis,
+        scheduler.scheduleAtFixedRate(this::flushDueToTimeout,
+                config.getFlushIntervalMillis(),
+                config.getFlushIntervalMillis(),
                 TimeUnit.MILLISECONDS);
 
-        logger.info(
-                "AuditProcessingService initialized: capacity={}, submissionLimit={}, flushInterval={}ms, threads={}",
-                queueCapacity, submissionLimit, flushIntervalMillis, auditThreads);
+        logger.info("AuditProcessingService initialized:");
+        logger.info("  - Queue capacity: {}", config.getQueueCapacity());
+        logger.info("  - Submission limit: {}", config.getSubmissionLimit());
+        logger.info("  - Flush interval (ms): {}", config.getFlushIntervalMillis());
+        logger.info("  - Audit threads: {}", config.getAuditThreads());
     }
 
     public boolean ingest(Transaction tx) {
+        logger.debug("Ingesting transaction: {}", tx);
         boolean accepted = transactionQueue.offer(tx);
         metrics.updateQueueSize(transactionQueue.size());
 
@@ -84,19 +76,25 @@ public class AuditProcessingService {
         return accepted;
     }
 
-    private void flushDueToTimeout() {
-        if (!transactionQueue.isEmpty() && submitting.compareAndSet(false, true)) {
+    public void flushIfThresholdMet() {
+        logger.info("Checking submission threshold: queueSize={}, submissionLimit={}", transactionQueue.size(),
+                submissionLimit);
+        if (transactionQueue.size() >= submissionLimit && submitting.compareAndSet(false, true)) {
+            logger.info("Submission threshold met. Triggering audit flush.");
             auditExecutor.submit(this::runAuditCycle);
         }
     }
 
-    public void flushIfThresholdMet() {
-        if (transactionQueue.size() >= submissionLimit && submitting.compareAndSet(false, true)) {
+    private void flushDueToTimeout() {
+        logger.info("Scheduled flush check: queueSize={}", transactionQueue.size());
+        if (!transactionQueue.isEmpty() && submitting.compareAndSet(false, true)) {
+            logger.info("Scheduled flush triggered. Submitting audit cycle.");
             auditExecutor.submit(this::runAuditCycle);
         }
     }
 
     private void runAuditCycle() {
+        logger.info("Starting audit cycle...");
         Timer.Sample latencySample = metrics.startAuditLatencySample();
 
         try {
@@ -104,18 +102,21 @@ public class AuditProcessingService {
             transactionQueue.drainTo(drained, submissionLimit);
             metrics.updateQueueSize(transactionQueue.size());
 
-            if (drained.isEmpty())
+            if (drained.isEmpty()) {
+                logger.info("Audit cycle skipped. No transactions drained.");
                 return;
+            }
 
             String batchId = UUID.randomUUID().toString();
+            logger.info("Persisting audit batch [{}] with {} transactions", batchId, drained.size());
             auditBatchPersistence.save(batchId, drained);
 
             List<AuditBatch> grouped = batchingAlgorithm.groupIntoBatches(drained);
+            logger.info("Grouped into {} sub-batches for submission", grouped.size());
             notifier.submit(grouped);
 
             auditBatchPersistence.markSubmitted(batchId);
-
-            logger.info("Audit batch [{}] submitted: {} transactions, {} sub-batches", batchId, drained.size(),
+            logger.info("Audit batch [{}] submitted. Transaction count: {}, sub-batches: {}", batchId, drained.size(),
                     grouped.size());
 
         } catch (Exception e) {
@@ -123,11 +124,13 @@ public class AuditProcessingService {
         } finally {
             submitting.set(false);
             metrics.recordAuditLatency(latencySample);
+            logger.info("Audit cycle complete. Submission flag cleared.");
         }
     }
 
     private void persistDropped(Transaction tx) {
         String dropId = "dropped-" + UUID.randomUUID();
+        logger.info("Persisting dropped transaction [{}]", dropId);
         try {
             auditBatchPersistence.save(dropId, Collections.singletonList(tx));
         } catch (Exception e) {
@@ -136,8 +139,9 @@ public class AuditProcessingService {
     }
 
     public void shutdown() {
+        logger.info("Initiating shutdown of AuditProcessingService...");
         scheduler.shutdown();
         auditExecutor.shutdown();
-        logger.info("AuditProcessingService shutting down gracefully.");
+        logger.info("AuditProcessingService shut down completed.");
     }
 }

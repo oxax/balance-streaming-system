@@ -11,6 +11,10 @@ public class TransactionConfigProperties {
     private double maxAmount;
     private double defaultBalance;
     private double maxBatchValue;
+    private int submissionLimit;
+    private int queueCapacity;
+    private long flushIntervalMillis;
+    private int auditThreads;
 
     public double getMinAmount() {
         return minAmount;
@@ -43,4 +47,37 @@ public class TransactionConfigProperties {
     public void setMaxBatchValue(double maxBatchValue) {
         this.maxBatchValue = maxBatchValue;
     }
+
+    public int getSubmissionLimit() {
+        return submissionLimit;
+    }
+
+    public void setSubmissionLimit(int submissionLimit) {
+        this.submissionLimit = submissionLimit;
+    }
+
+    public int getQueueCapacity() {
+        return queueCapacity;
+    }
+
+    public void setQueueCapacity(int queueCapacity) {
+        this.queueCapacity = queueCapacity;
+    }
+
+    public long getFlushIntervalMillis() {
+        return flushIntervalMillis;
+    }
+
+    public void setFlushIntervalMillis(long flushIntervalMillis) {
+        this.flushIntervalMillis = flushIntervalMillis;
+    }
+
+    public int getAuditThreads() {
+        return auditThreads;
+    }
+
+    public void setAuditThreads(int auditThreads) {
+        this.auditThreads = auditThreads;
+    }
+
 }

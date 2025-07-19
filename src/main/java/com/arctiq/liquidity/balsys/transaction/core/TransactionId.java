@@ -1,4 +1,4 @@
-package com.arctiq.liquidity.balsys.account.domain.model;
+package com.arctiq.liquidity.balsys.transaction.core;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
