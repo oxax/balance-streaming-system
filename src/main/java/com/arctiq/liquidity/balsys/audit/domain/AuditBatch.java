@@ -12,21 +12,24 @@ public class AuditBatch {
     private final String batchId;
     private List<Transaction> transactions = new ArrayList<>();
     private Money totalValue = Money.of(0.0);
-    private static final Money VALUE_LIMIT = Money.of(1_000_000.0);
+    // private static final Money VALUE_LIMIT = Money.of(1_000_000.0);
     // public AuditBatch(String batchId) {
     // this.batchId = batchId;
     // }
 
-    public AuditBatch(String batchId, List<Transaction> transactions) {
+    private final Money valueLimit;
+
+    public AuditBatch(String batchId, List<Transaction> transactions, Money valueLimit) {
         this.batchId = batchId;
         this.transactions = List.copyOf(transactions);
         this.totalValue = transactions.stream()
                 .map(Transaction::absoluteValue)
                 .reduce(Money.of(0.0), Money::add);
+        this.valueLimit = valueLimit;
     }
 
     public boolean canAccept(Transaction tx) {
-        return totalValue.add(tx.absoluteValue()).amount().compareTo(VALUE_LIMIT.amount()) <= 0;
+        return totalValue.add(tx.absoluteValue()).amount().compareTo(valueLimit.amount()) <= 0;
     }
 
     // public void add(Transaction tx) {

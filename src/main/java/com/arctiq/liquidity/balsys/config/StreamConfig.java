@@ -25,12 +25,12 @@ public class StreamConfig {
 
     @Bean
     public CreditProducer creditProducer() {
-        return new CreditProducer();
+        return new CreditProducer(new TransactionConfigProperties());
     }
 
     @Bean
     public DebitProducer debitProducer() {
-        return new DebitProducer();
+        return new DebitProducer(new TransactionConfigProperties());
     }
 
     @Bean

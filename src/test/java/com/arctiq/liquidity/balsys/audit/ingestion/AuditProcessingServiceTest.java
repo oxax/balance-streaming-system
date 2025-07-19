@@ -18,6 +18,7 @@ import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
 import com.arctiq.liquidity.balsys.audit.grouping.BatchingAlgorithm;
 import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
 import com.arctiq.liquidity.balsys.audit.persistence.InMemoryAuditBatchStore;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
@@ -50,7 +51,7 @@ class AuditProcessingServiceTest {
                 1000,
                 1000,
                 1,
-                new BatchingAlgorithm(),
+                new BatchingAlgorithm(new TransactionConfigProperties()),
                 notifier,
                 persistence,
                 metricsCollector);

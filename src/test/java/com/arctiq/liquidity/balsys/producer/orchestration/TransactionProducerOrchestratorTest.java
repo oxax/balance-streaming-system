@@ -4,7 +4,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.random.RandomGenerator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +13,7 @@ import com.arctiq.liquidity.balsys.account.application.BankAccountService;
 import com.arctiq.liquidity.balsys.account.application.BankAccountServiceImpl;
 import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
 import com.arctiq.liquidity.balsys.account.domain.model.TransactionId;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.producer.channel.TransactionProducer;
 import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
@@ -23,13 +23,11 @@ class TransactionProducerOrchestratorTest {
     LinkedTransferQueue<Transaction> queue;
     BankAccountService accountService;
     ExecutorService executor;
-    private RandomGenerator generator;
 
     @BeforeEach
     void setup() {
         queue = new LinkedTransferQueue<>();
-        accountService = new BankAccountServiceImpl(queue);
-        generator = RandomGenerator.getDefault();
+        accountService = new BankAccountServiceImpl(queue, new TransactionConfigProperties());
         executor = Executors.newFixedThreadPool(2);
     }
 

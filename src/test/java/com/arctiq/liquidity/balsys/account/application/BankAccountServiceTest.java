@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
 import com.arctiq.liquidity.balsys.account.domain.model.TransactionId;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 
@@ -25,7 +26,7 @@ class BankAccountServiceTest {
     @BeforeEach
     void setup() {
         queue = new LinkedTransferQueue<>();
-        service = new BankAccountServiceImpl(queue);
+        service = new BankAccountServiceImpl(queue, new TransactionConfigProperties());
     }
 
     @Test

@@ -7,11 +7,16 @@ import java.util.UUID;
 
 import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
 import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 
 public class BatchingAlgorithm {
 
-    private static final Money MAX_BATCH_TOTAL = Money.of(1_000_000.0);
+    private final Money maxBatchValue;
+
+    public BatchingAlgorithm(TransactionConfigProperties config) {
+        this.maxBatchValue = Money.of(config.getMaxBatchValue());
+    }
 
     public List<AuditBatch> groupIntoBatches(List<Transaction> transactions) {
         List<AuditBatch> auditBatches = new ArrayList<>();
@@ -30,7 +35,7 @@ public class BatchingAlgorithm {
                         .map(Transaction::absoluteValue)
                         .reduce(Money.of(0.0), Money::add);
 
-                if (batchTotal.add(txValue).amount().compareTo(MAX_BATCH_TOTAL.amount()) <= 0) {
+                if (batchTotal.add(txValue).amount().compareTo(maxBatchValue.amount()) <= 0) {
                     batch.add(tx);
                     placed = true;
                     break;
@@ -46,7 +51,7 @@ public class BatchingAlgorithm {
 
         for (List<Transaction> batch : rawBatches) {
             String batchId = "batch-" + UUID.randomUUID();
-            auditBatches.add(new AuditBatch(batchId, batch));
+            auditBatches.add(new AuditBatch(batchId, batch, maxBatchValue));
         }
 
         return auditBatches;

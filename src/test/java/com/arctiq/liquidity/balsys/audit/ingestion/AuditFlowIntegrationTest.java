@@ -16,6 +16,7 @@ import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
 import com.arctiq.liquidity.balsys.audit.grouping.BatchingAlgorithm;
 import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
 import com.arctiq.liquidity.balsys.audit.persistence.InMemoryAuditBatchStore;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
@@ -29,14 +30,15 @@ class AuditFlowIntegrationTest {
         LinkedTransferQueue<Transaction> queue = new LinkedTransferQueue<>();
         SpyAuditNotifier spyNotifier = new SpyAuditNotifier();
         AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
+        TransactionConfigProperties transactionConfigProperties = new TransactionConfigProperties();
 
-        BankAccountService accountService = new BankAccountServiceImpl(queue);
+        BankAccountService accountService = new BankAccountServiceImpl(queue, transactionConfigProperties);
         AuditProcessingService auditService = new AuditProcessingService(
                 1000,
                 1000,
                 1000,
                 1,
-                new BatchingAlgorithm(),
+                new BatchingAlgorithm(transactionConfigProperties),
                 spyNotifier,
                 persistence,
                 new MetricsCollector(new SimpleMeterRegistry()));

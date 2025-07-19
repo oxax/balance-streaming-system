@@ -28,7 +28,7 @@ public class DomainConfig {
 
     @Bean
     public BankAccountService bankAccountService(LinkedTransferQueue<Transaction> transactionQueue) {
-        return new BankAccountServiceImpl(transactionQueue);
+        return new BankAccountServiceImpl(transactionQueue, new TransactionConfigProperties());
     }
 
     @Bean
@@ -42,7 +42,8 @@ public class DomainConfig {
             MetricsCollector metricsCollector) {
 
         return new AuditProcessingService(queueCapacity, submissionLimit, flushIntervalMillis, auditThreads,
-                new BatchingAlgorithm(), new ConsoleAuditNotifier(metricsCollector, auditStatsService),
+                new BatchingAlgorithm(new TransactionConfigProperties()),
+                new ConsoleAuditNotifier(metricsCollector, auditStatsService),
                 auditBatchPersistence, metricsCollector);
     }
 

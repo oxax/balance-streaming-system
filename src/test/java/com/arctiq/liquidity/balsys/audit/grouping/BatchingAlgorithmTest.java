@@ -15,16 +15,18 @@ import org.junit.jupiter.api.Test;
 import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
 import com.arctiq.liquidity.balsys.account.domain.model.TransactionId;
 import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 
 class BatchingAlgorithmTest {
 
-    private final BatchingAlgorithm algorithm = new BatchingAlgorithm();
+    private BatchingAlgorithm algorithm;
     private RandomGenerator generator;
 
     @BeforeEach
     void setup() {
         generator = RandomGenerator.getDefault();
+        algorithm = new BatchingAlgorithm(new TransactionConfigProperties());
     }
 
     private Transaction generateRandomTransaction() {

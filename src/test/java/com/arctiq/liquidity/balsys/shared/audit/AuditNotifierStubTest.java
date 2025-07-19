@@ -3,7 +3,6 @@ package com.arctiq.liquidity.balsys.shared.audit;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.random.RandomGenerator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,13 +19,11 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class AuditNotifierStubTest {
 
-    private RandomGenerator generator;
     private MetricsCollector metricsCollector;
     private AuditNotifier stub;
 
     @BeforeEach
     void setup() {
-        generator = RandomGenerator.getDefault();
         metricsCollector = new MetricsCollector(new SimpleMeterRegistry());
         stub = new ConsoleAuditNotifier(metricsCollector, new AuditStatsService());
     }
@@ -45,7 +42,7 @@ class AuditNotifierStubTest {
                 Money.of(50_000.0),
                 Instant.now());
 
-        mockBatches.add(new AuditBatch("batch-1", List.of(tx1, tx2)));
+        mockBatches.add(new AuditBatch("batch-1", List.of(tx1, tx2), Money.of(50_000.0)));
 
         stub.submit(mockBatches);
     }

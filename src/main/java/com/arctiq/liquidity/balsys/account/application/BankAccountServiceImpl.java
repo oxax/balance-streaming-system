@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.arctiq.liquidity.balsys.account.domain.model.Transaction;
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 
 public class BankAccountServiceImpl implements BankAccountService {
@@ -17,9 +18,10 @@ public class BankAccountServiceImpl implements BankAccountService {
     private final LinkedTransferQueue<Transaction> transactionQueue;
     private final List<Transaction> transactionHistory;
 
-    public BankAccountServiceImpl(LinkedTransferQueue<Transaction> transactionQueue) {
+    public BankAccountServiceImpl(LinkedTransferQueue<Transaction> transactionQueue,
+            TransactionConfigProperties config) {
         this.transactionQueue = transactionQueue;
-        this.balance = new AtomicReference<>(Money.of(0.0));
+        this.balance = new AtomicReference<>(Money.of(config.getDefaultBalance()));
         this.transactionHistory = new CopyOnWriteArrayList<>();
     }
 

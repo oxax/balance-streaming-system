@@ -1,5 +1,6 @@
 package com.arctiq.liquidity.balsys.account.domain.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
@@ -22,6 +23,11 @@ public record Transaction(
         }
         if (timestamp == null) {
             throw new TransactionValidationException("Transaction timestamp must not be null");
+        }
+
+        BigDecimal abs = amount.amount().abs();
+        if (abs.compareTo(BigDecimal.valueOf(200)) < 0 || abs.compareTo(BigDecimal.valueOf(500_000)) > 0) {
+            throw new TransactionValidationException("Transaction amount is out of range: " + amount.amount());
         }
     }
 
