@@ -6,13 +6,17 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Java CI with Maven
+name: Liquidity Balsys  CI Pipeline with Maven
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
+permissions:
+  contents: write
+  security-events: write
 
 jobs:
   build:
