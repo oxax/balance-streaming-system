@@ -8,7 +8,8 @@ import com.arctiq.liquidity.balsys.audit.persistence.InMemoryAuditBatchStore;
 import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
-import com.arctiq.liquidity.balsys.audit.grouping.BatchingAlgorithm;
+import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
 import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 
@@ -34,7 +35,7 @@ class AuditFlowIntegrationTest {
         MetricsCollector metrics = new MetricsCollector(new SimpleMeterRegistry());
         AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
         AuditNotifier notifier = new ConsoleAuditNotifier(metrics, statsService);
-        BatchingAlgorithm batchingAlgorithm = new BatchingAlgorithm(Money.of(config.getMaxBatchValue()));
+        BatchingStrategy batchingStrategy = new GreedyBatchingStrategy(Money.of(config.getMaxBatchValue()));
         LinkedTransferQueue<Transaction> queue = new LinkedTransferQueue<>();
 
         BankAccountService accountService = new BankAccountServiceImpl(queue, config, metrics);
@@ -42,19 +43,16 @@ class AuditFlowIntegrationTest {
         AuditProcessingService auditService = new AuditProcessingService(
                 queue,
                 config,
-                batchingAlgorithm,
+                batchingStrategy,
                 notifier,
                 persistence,
                 metrics);
 
         persistence.clear();
         List<Transaction> txs = AuditTestFixtures.thresholdTransactions(config.getSubmissionLimit(), 250_000.0);
-        System.out.println("txs size " + txs.size());
         txs.forEach(accountService::processTransaction);
 
-        System.out.println("Queue size after submission: " + queue.size());
         auditService.flushIfThresholdMet();
-        System.out.println("Queue size after flush: " + queue.size());
 
         int maxWaitMillis = 1000;
         int elapsed = 0;
@@ -64,7 +62,6 @@ class AuditFlowIntegrationTest {
         }
 
         List<AuditBatch> persisted = persistence.fetchAll();
-        System.out.println("persisted " + persisted);
         assertFalse(persisted.isEmpty(), "Audit should persist batches after threshold");
         int totalTx = persisted.stream().mapToInt(AuditBatch::getTransactionCount).sum();
         assertEquals(config.getSubmissionLimit(), totalTx, "Expected all submitted transactions to be batched");

@@ -1,24 +1,21 @@
 package com.arctiq.liquidity.balsys.audit.grouping;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
-
 import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 
-public class BatchingAlgorithm {
+import java.util.*;
+
+public class GreedyBatchingStrategy implements BatchingStrategy {
 
     private final Money valueLimit;
 
-    public BatchingAlgorithm(Money valueLimit) {
+    public GreedyBatchingStrategy(Money valueLimit) {
         this.valueLimit = valueLimit;
     }
 
+    @Override
     public List<AuditBatch> groupIntoBatches(List<Transaction> transactions) {
-        List<AuditBatch> auditBatches = new ArrayList<>();
         List<List<Transaction>> rawBatches = new ArrayList<>();
 
         List<Transaction> sorted = transactions.stream()
@@ -48,6 +45,7 @@ public class BatchingAlgorithm {
             }
         }
 
+        List<AuditBatch> auditBatches = new ArrayList<>();
         for (List<Transaction> batch : rawBatches) {
             String batchId = "batch-" + UUID.randomUUID();
             auditBatches.add(new AuditBatch(batchId, batch, valueLimit));

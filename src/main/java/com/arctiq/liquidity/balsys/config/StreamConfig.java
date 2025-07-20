@@ -5,14 +5,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedTransferQueue;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.arctiq.liquidity.balsys.account.application.BankAccountService;
+import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
 import com.arctiq.liquidity.balsys.producer.channel.CreditProducer;
 import com.arctiq.liquidity.balsys.producer.channel.DebitProducer;
 import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
 import com.arctiq.liquidity.balsys.producer.orchestration.TransactionProducerOrchestrator;
+import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 
@@ -59,4 +63,11 @@ public class StreamConfig {
             orchestrator.startEmitLoops(new ProducerConfig(1000, 60));
         };
     }
+
+    @Bean
+    @ConditionalOnProperty(name = "transaction.batching.strategy", havingValue = "greedy")
+    public BatchingStrategy greedyBatchingStrategy(BatchingConfigProperties config) {
+        return new GreedyBatchingStrategy(Money.of(config.getValueLimit()));
+    }
+
 }

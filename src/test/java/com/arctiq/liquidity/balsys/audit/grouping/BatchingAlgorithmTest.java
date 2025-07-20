@@ -17,20 +17,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BatchingAlgorithmTest {
 
-    private BatchingAlgorithm algorithm;
+    private BatchingStrategy batchingStrategy;
     private TransactionConfigProperties config;
 
     @BeforeEach
     void setup() {
         config = AuditTestFixtures.config();
-        algorithm = new BatchingAlgorithm(Money.of(config.getMaxBatchValue()));
+        batchingStrategy = new GreedyBatchingStrategy(Money.of(config.getMaxBatchValue()));
     }
 
     @Test
     @DisplayName("Batches must respect £1M max total per batch")
     void shouldRespectBatchSizeLimit() {
         List<Transaction> transactions = AuditTestFixtures.randomTransactions(1000, config);
-        List<AuditBatch> batches = algorithm.groupIntoBatches(transactions);
+        List<AuditBatch> batches = batchingStrategy.groupIntoBatches(transactions);
 
         for (AuditBatch batch : batches) {
             double total = batch.getTotalValue().asDouble();
@@ -47,7 +47,7 @@ class BatchingAlgorithmTest {
                 AuditTestFixtures.fixedTransaction(400_000.0),
                 AuditTestFixtures.fixedTransaction(200_000.0));
 
-        List<AuditBatch> batches = algorithm.groupIntoBatches(transactions);
+        List<AuditBatch> batches = batchingStrategy.groupIntoBatches(transactions);
 
         assertEquals(2, batches.size());
         int totalTx = batches.stream().mapToInt(AuditBatch::getTransactionCount).sum();
@@ -58,7 +58,7 @@ class BatchingAlgorithmTest {
     @DisplayName("Handles edge case: all transactions near threshold")
     void shouldCreateMultipleBatchesForLargeSameSizeTransactions() {
         List<Transaction> transactions = AuditTestFixtures.thresholdTransactions(3, 999_999.0);
-        List<AuditBatch> batches = algorithm.groupIntoBatches(transactions);
+        List<AuditBatch> batches = batchingStrategy.groupIntoBatches(transactions);
 
         assertEquals(3, batches.size());
         for (AuditBatch batch : batches) {

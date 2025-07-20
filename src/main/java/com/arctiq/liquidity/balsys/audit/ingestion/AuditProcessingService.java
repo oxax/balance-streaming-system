@@ -1,7 +1,7 @@
 package com.arctiq.liquidity.balsys.audit.ingestion;
 
 import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
-import com.arctiq.liquidity.balsys.audit.grouping.BatchingAlgorithm;
+import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
 import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
 import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
@@ -22,7 +22,7 @@ public class AuditProcessingService {
     private static final Logger logger = LoggerFactory.getLogger(AuditProcessingService.class);
 
     private final BlockingQueue<Transaction> transactionQueue;
-    private final BatchingAlgorithm batchingAlgorithm;
+    private final BatchingStrategy batchingStrategy;
     private final AuditNotifier notifier;
     private final AuditBatchPersistence auditBatchPersistence;
     private final MetricsCollector metrics;
@@ -36,14 +36,14 @@ public class AuditProcessingService {
     public AuditProcessingService(
             BlockingQueue<Transaction> transactionQueue,
             TransactionConfigProperties config,
-            BatchingAlgorithm batchingAlgorithm,
+            BatchingStrategy batchingStrategy,
             AuditNotifier notifier,
             AuditBatchPersistence auditBatchPersistence,
             MetricsCollector metrics) {
 
         this.transactionQueue = transactionQueue;
         this.submissionLimit = config.getSubmissionLimit();
-        this.batchingAlgorithm = batchingAlgorithm;
+        this.batchingStrategy = batchingStrategy;
         this.notifier = notifier;
         this.auditBatchPersistence = auditBatchPersistence;
         this.metrics = metrics;
@@ -111,7 +111,7 @@ public class AuditProcessingService {
             logger.info("Persisting audit batch [{}] with {} transactions", batchId, drained.size());
             auditBatchPersistence.save(batchId, drained);
 
-            List<AuditBatch> grouped = batchingAlgorithm.groupIntoBatches(drained);
+            List<AuditBatch> grouped = batchingStrategy.groupIntoBatches(drained);
             logger.info("Grouped into {} sub-batches for submission", grouped.size());
             notifier.submit(grouped);
 

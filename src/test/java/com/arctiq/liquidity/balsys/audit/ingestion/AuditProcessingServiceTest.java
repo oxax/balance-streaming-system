@@ -1,6 +1,7 @@
 package com.arctiq.liquidity.balsys.audit.ingestion;
 
-import com.arctiq.liquidity.balsys.audit.grouping.BatchingAlgorithm;
+import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
 import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
 import com.arctiq.liquidity.balsys.audit.persistence.InMemoryAuditBatchStore;
 import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
@@ -37,8 +38,9 @@ class AuditProcessingServiceTest {
         notifier = new LoggingAuditNotifier();
         transactionQueue = new LinkedTransferQueue<>();
         AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
-        BatchingAlgorithm algorithm = new BatchingAlgorithm(Money.of(config.getMaxBatchValue()));
-        auditService = new AuditProcessingService(transactionQueue, config, algorithm, notifier, persistence, metrics);
+        BatchingStrategy batchingStrategy = new GreedyBatchingStrategy(Money.of(config.getMaxBatchValue()));
+        auditService = new AuditProcessingService(transactionQueue, config, batchingStrategy, notifier, persistence,
+                metrics);
     }
 
     @Test
@@ -49,9 +51,7 @@ class AuditProcessingServiceTest {
             auditService.ingest(tx);
         }
 
-        System.out.println("Queue size after submission: " + transactionQueue.size());
         auditService.flushIfThresholdMet();
-        System.out.println("Queue size after flush: " + transactionQueue.size());
 
         int maxWaitMillis = 1000;
         int elapsed = 0;
