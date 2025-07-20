@@ -1,50 +1,45 @@
 package com.arctiq.liquidity.balsys.audit.dispatch;
 
-import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.arctiq.liquidity.balsys.audit.application.AuditStatsService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
 import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
-import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 public class ConsoleAuditNotifier implements AuditNotifier {
 
-    private final MetricsCollector metrics;
-    private final AuditStatsService statsService;
+    private static final Logger logger = LoggerFactory.getLogger(ConsoleAuditNotifier.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
 
-    public ConsoleAuditNotifier(MetricsCollector metrics, AuditStatsService statsService) {
-        this.metrics = metrics;
-        this.statsService = statsService;
+    public ConsoleAuditNotifier() {
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
     }
 
     @Override
     public void submit(List<AuditBatch> batches) {
+        var batchSummaries = batches.stream()
+                .map(batch -> {
+                    Map<String, Object> ordered = new LinkedHashMap<>();
+                    ordered.put("totalValueOfAllTransactions", batch.getTotalValue().roundedTo3Decimals());
+                    ordered.put("countOfTransactions", batch.getTransactionCount());
+                    return ordered;
+                })
+                .toList();
 
-        metrics.recordAuditSubmission(batches);
-        statsService.record(batches); // stores for REST exposure
-        statsService.recordTelemetryEvent("Submitted " + batches.size() + " batches at " + Instant.now());
+        Map<String, Object> payload = Map.of("submission", Map.of("batches", batchSummaries));
 
-        var submission = Map.of("submission", Map.of("batches", batches.stream()
-                .map(batch -> Map.of(
-                        "totalValueOfAllTransactions", batch.getTotalValue(),
-                        "countOfTransactions", batch.getTransactionCount()))
-                .toList()));
-
-        System.out.println(prettyPrint(submission));
-    }
-
-    private String prettyPrint(Object obj) {
-        return """
-                {
-                  "submission": {
-                    "batches": [
-                """ +
-                ((List<?>) ((Map<?, ?>) ((Map<?, ?>) obj).get("submission")).get("batches")).stream()
-                        .map(b -> "      " + b.toString().replace("=", ":"))
-                        .reduce((a, b) -> a + ",\n" + b).orElse("")
-                +
-                "\n    ]\n  }\n}";
+        try {
+            String json = mapper.writeValueAsString(payload);
+            logger.info("Audit Submission:\n{}", json);
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to serialize audit payload", e);
+        }
     }
 }

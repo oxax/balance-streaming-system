@@ -44,7 +44,7 @@ public class DomainConfig {
 
     @Bean
     public AuditNotifier auditNotifier(MetricsCollector metricsCollector, AuditStatsService auditStatsService) {
-        return new ConsoleAuditNotifier(metricsCollector, auditStatsService);
+        return new ConsoleAuditNotifier();
     }
 
     @Bean

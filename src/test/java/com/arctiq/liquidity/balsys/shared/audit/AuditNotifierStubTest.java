@@ -25,7 +25,7 @@ class AuditNotifierStubTest {
     void setup() {
         config = AuditTestFixtures.config();
         MetricsCollector metrics = new MetricsCollector(new SimpleMeterRegistry());
-        stub = new ConsoleAuditNotifier(metrics, new AuditStatsService());
+        stub = new ConsoleAuditNotifier();
     }
 
     @Test

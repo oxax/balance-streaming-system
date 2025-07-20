@@ -34,7 +34,7 @@ class AuditFlowIntegrationTest {
         TransactionConfigProperties config = AuditTestFixtures.config();
         MetricsCollector metrics = new MetricsCollector(new SimpleMeterRegistry());
         AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
-        AuditNotifier notifier = new ConsoleAuditNotifier(metrics, statsService);
+        AuditNotifier notifier = new ConsoleAuditNotifier();
         BatchingStrategy batchingStrategy = new GreedyBatchingStrategy(Money.of(config.getMaxBatchValue()));
         LinkedTransferQueue<Transaction> queue = new LinkedTransferQueue<>();
 

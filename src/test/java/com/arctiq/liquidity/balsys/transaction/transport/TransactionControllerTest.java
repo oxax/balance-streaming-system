@@ -45,7 +45,7 @@ class TransactionControllerTest {
                 doNothing().when(accountService).processTransaction(tx);
 
                 webTestClient.post()
-                                .uri("/transactions")
+                                .uri("/transactions/submit")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .bodyValue(tx)
                                 .exchange()
@@ -65,7 +65,7 @@ class TransactionControllerTest {
                                 .when(accountService).processTransaction(tx);
 
                 webTestClient.post()
-                                .uri("/transactions")
+                                .uri("/transactions/submit")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .bodyValue(tx)
                                 .exchange()
@@ -84,7 +84,7 @@ class TransactionControllerTest {
                                 .when(accountService).processTransaction(tx);
 
                 webTestClient.post()
-                                .uri("/transactions")
+                                .uri("/transactions/submit")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .bodyValue(tx)
                                 .exchange()
@@ -105,7 +105,7 @@ class TransactionControllerTest {
 
                 webTestClient.get()
                                 .uri(uriBuilder -> uriBuilder
-                                                .path("/transactions")
+                                                .path("/transactions/history")
                                                 .queryParam("start", start.toString())
                                                 .queryParam("end", end.toString())
                                                 .build())

@@ -1,13 +1,16 @@
 package com.arctiq.liquidity.balsys.producer.simulation;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PreDestroy;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import com.arctiq.liquidity.balsys.account.application.BankAccountService;
+import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
 import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.producer.channel.TransactionProducer;
 import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
@@ -16,19 +19,16 @@ import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 
-import java.util.concurrent.*;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PreDestroy;
 
-import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
-
-@Component
 public class TransactionSimulationManager {
 
     private static final Logger logger = LoggerFactory.getLogger(TransactionSimulationManager.class);
 
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledExecutorService scheduler;
     private final ExecutorService emitExecutor = Executors.newFixedThreadPool(2);
     private final TransactionProducerOrchestrator orchestrator;
-    private final MetricsCollector metricsCollector;
 
     public TransactionSimulationManager(
             TransactionConfigProperties config,
@@ -38,8 +38,6 @@ public class TransactionSimulationManager {
             BankAccountService accountService,
             AuditProcessingService auditProcessingService) {
 
-        this.metricsCollector = metricsCollector;
-
         TransactionProducer creditProducer = () -> AuditTestFixtures.randomCredit(config);
         TransactionProducer debitProducer = () -> AuditTestFixtures.randomDebit(config);
 
@@ -48,25 +46,36 @@ public class TransactionSimulationManager {
                 debitProducer,
                 accountService,
                 auditProcessingService,
-                txQueue,
-                emitExecutor,
                 meterRegistry,
+                emitExecutor,
                 metricsCollector);
     }
 
-    public void startSimulation(int transactionCount, int durationSeconds) {
-        logger.info("🟢 Starting simulation with {} transactions over {} seconds", transactionCount, durationSeconds);
+    public synchronized void startSimulation(int transactionCount, int durationSeconds) {
+        logger.info("Starting recurring simulation: emit {} every {} seconds", transactionCount, durationSeconds);
+
+        if (scheduler == null || scheduler.isShutdown()) {
+            scheduler = Executors.newSingleThreadScheduledExecutor();
+            logger.info("Scheduler reinitialized");
+        }
+
         ProducerConfig config = new ProducerConfig(transactionCount, durationSeconds);
-        orchestrator.startEmitLoops(config);
-        orchestrator.triggerAuditIfThresholdMet();
-        scheduler.scheduleAtFixedRate(metricsCollector::logRuntimeMetrics, 5, 10, TimeUnit.SECONDS);
+
+        scheduler.scheduleAtFixedRate(() -> emitExecutor.submit(() -> {
+            logger.debug("Scheduled emit triggered");
+            orchestrator.startEmitLoops(config);
+        }), 0, durationSeconds, TimeUnit.SECONDS);
     }
 
-    public void stopSimulation() {
-        logger.info("🛑 Stopping simulation...");
-        scheduler.shutdownNow();
+    public synchronized void stopSimulation() {
+        logger.info("Stopping simulation...");
+
+        if (scheduler != null && !scheduler.isShutdown()) {
+            scheduler.shutdownNow();
+            logger.info("Scheduler shutdown complete");
+        }
+
         emitExecutor.shutdownNow();
-        metricsCollector.logRuntimeMetrics(); // final snapshot
     }
 
     @PreDestroy

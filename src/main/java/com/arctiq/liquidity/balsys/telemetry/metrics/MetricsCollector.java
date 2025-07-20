@@ -88,6 +88,7 @@ public class MetricsCollector {
     }
 
     public void recordTransactionOutcome(TransactionOutcome outcome) {
+        logger.debug("Record Transaction Outcome at {} | queue size is {} ", outcome, queueSize);
         if (outcome instanceof TransactionAccepted) {
             acceptedTxCount.incrementAndGet();
         } else if (outcome instanceof TransactionInvalid) {
@@ -103,7 +104,7 @@ public class MetricsCollector {
     }
 
     public void logRuntimeMetrics() {
-        logger.info("🧮 Metrics Snapshot [{}]", Instant.now());
+        logger.info("Metrics Snapshot [{}]", Instant.now());
         logger.info(" - Queue Size: {}", getCurrentQueueSize());
         logger.info(" - Dropped Tx: {}", getDroppedTxCount());
         logger.info(" - Accepted Tx: {}", getAcceptedTxCount());

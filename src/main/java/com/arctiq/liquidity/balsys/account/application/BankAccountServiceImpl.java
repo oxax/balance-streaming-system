@@ -1,13 +1,5 @@
 package com.arctiq.liquidity.balsys.account.application;
 
-import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
-import com.arctiq.liquidity.balsys.shared.domain.model.Money;
-import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
-import com.arctiq.liquidity.balsys.transaction.core.Transaction;
-import com.arctiq.liquidity.balsys.transaction.core.TransactionValidator;
-import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionAccepted;
-import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionInvalid;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +7,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+
+import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
+import com.arctiq.liquidity.balsys.shared.domain.model.Money;
+import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.arctiq.liquidity.balsys.transaction.core.Transaction;
+import com.arctiq.liquidity.balsys.transaction.core.TransactionValidator;
+import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionAccepted;
+import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionInvalid;
 
 public class BankAccountServiceImpl implements BankAccountService {
 
@@ -51,7 +51,7 @@ public class BankAccountServiceImpl implements BankAccountService {
         balance.updateAndGet(b -> b.add(transaction.amount()));
         transactionQueue.offer(transaction);
         transactionHistory.add(transaction);
-
+        metricsCollector.updateQueueSize(transactionQueue.size());
         metricsCollector.recordTransactionOutcome(new TransactionAccepted(transaction));
     }
 

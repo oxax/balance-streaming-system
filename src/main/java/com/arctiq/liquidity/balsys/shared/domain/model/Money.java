@@ -1,6 +1,7 @@
 package com.arctiq.liquidity.balsys.shared.domain.model;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Objects;
 
 public record Money(BigDecimal amount) {
@@ -31,6 +32,14 @@ public record Money(BigDecimal amount) {
 
     public double asDouble() {
         return amount.doubleValue();
+    }
+
+    public double rounded(int scale) {
+        return amount.setScale(scale, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    public double roundedTo3Decimals() {
+        return rounded(3);
     }
 
     public static Money of(double value) {
