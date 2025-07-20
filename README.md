@@ -1,9 +1,8 @@
 # Balance Streaming System
 **High-Throughput, Low-Latency Transaction Engine**
- A latency-sensitive Java service that simulates streaming credit/debit events, maintains accurate balance state, and submits cost-constrained audit batches for external review. Designed with microservice-ready modularity and performance-aware architecture.
- This system is designed to be modular and testable, with clear pathways to scale: transaction ingestion can later be offloaded to a durable event broker (e.g. Kafka), and batching can be distributed via consumer groups without redesigning core interfaces.
+A performance-aware Java system that simulates streaming credit/debit ingestion, balance computation, and audit batching — designed with modular domain boundaries, observability, and microservice evolution in mind.
 
- ---
+![Architecture Diagram](./docs/system-architecture.png)
 
 ## Problem Summary
 
@@ -16,55 +15,97 @@ Design an application that:
 - Exposes rich metrics and supports performance validation.
 
 ---
+## Features
+
+- Real-time credit/debit ingestion (~50 TPS simulated)
+- Atomic balance mutation with telemetry hooks
+- Bin-packed audit batches under £1M constraint
+- Pluggable batching algorithm
+- In-memory persistence layer (swappable)
+- REST APIs for transaction, balance, audit stats, and telemetry
+
+---
+
+## 📦 Package Structure
+
+| Boundary     | Package Prefix                             | Responsibility                                  |
+|--------------|---------------------------------------------|--------------------------------------------------|
+| `account`    | `com.arctiq.liquidity.balsys.account`       | Balance tracking and transaction application     |
+| `audit`      | `com.arctiq.liquidity.balsys.audit`         | Audit batching, submission, metrics, and persistence |
+| `producer`   | `com.arctiq.liquidity.balsys.producer`      | Simulates credit/debit transaction flow (~50 TPS) |
+| `shared`     | `com.arctiq.liquidity.balsys.shared`        | DTOs, factories, domain types, and observability tools |
+| `telemetry`  | `com.arctiq.liquidity.balsys.telemetry`     | Audit stats tracking and runtime event logging     |
+| `exception`  | `com.arctiq.liquidity.balsys.exception`     | Domain-safe exception handling with global mappers |
+| `transaction`| `com.arctiq.liquidity.balsys.transaction`   | Immutable domain model (`Transaction` record, validation) |
+
+---
+
+## 🧭 Architecture Overview
+
+> For full design details and cloud integration strategy, see [docs/system-notes.md](./docs/system-notes.md)
+
+```
+SimulatedProducer
+        ↓
+BankAccountService → LinkedTransferQueue
+        ↓
+AuditProcessingService → BatchingAlgorithm (bin-pack)
+        ↓
+AuditBatchPersistence + AuditNotifier
+        ↓
+AuditStatsService → REST API
+```
+
+---
+## 📡 REST Endpoints
+
+| Endpoint                  | Purpose                                      |
+|---------------------------|----------------------------------------------|
+| `/account/balance`        | Fetch the current account balance            |
+| `/simulation/start`       | Start transaction simulation with optional TPM |
+| `/simulation/stop`        | Stop active transaction producers            |
+| `/simulation/status`      | View queue status, balance, and ingest metrics |
+| `/simulation/metrics`     | View TPS metrics and audit submission stats  |
+| `/simulation/telemetry`   | View telemetry events for audit activity     |
+
+---
 
 
-## Evolution Strategy
+## ☁️ Cloud-Ready Design
 
-This implementation reflects a modular, production-aware design for tracking bank account balances and audit batching. Key enhancements include:
+| Concern             | AWS Service Suggestion            |
+|---------------------|-----------------------------------|
+| Queue ingestion     | Kafka (MSK) or Kinesis            |
+| Persistence         | Aurora or DynamoDB               |
+| Batch durability    | Amazon S3 or PostgreSQL          |
+| External audit flow | EventBridge or SNS               |
+| Observability       | CloudWatch, X-Ray, QuickSight    |
 
-- **Bin-Packing Audit Optimization**: Uses First Fit Decreasing to minimize batch count under £1M constraints.
-- **Configurable Audit Trigger**: Submission threshold is externally configurable via `AuditConfig`, enabling performance tuning.
-- **Observability Hooks**: `MetricsCollector` timestamps ingestion, balance updates, and audit submissions for latency profiling.
-- **Thread Safety**: `processTransaction` is synchronized to ensure atomic updates under concurrent load.
-- **DDD Alignment**: Domain logic is encapsulated in `BankAccountService`, with implementation in the application layer.
-- **Scalability Readiness**: Batching logic is isolated and ready for evolution toward event-driven or distributed durability.
+---
 
-### Future Enhancements
+## 🧠 Architectural Highlights
 
-- Introduce Prometheus-compatible metrics and MDC-based structured logging.
-- Evolve batching toward event sourcing or Kafka-based durability.
-- Simulate high-volume ingestion (e.g. 100k transactions) and benchmark batch performance.
-- Add REST endpoints for audit traceability and batch introspection.
+- Clean separation of domains → microservice-ready
+- Lock-free concurrency and backpressure via bounded queue
+- Configurable batching threshold
+- Observability-first with structured metrics
+- Ready for async event ingestion via Kafka or streaming gateway
 
-This README is designed to guide reviewers through architectural decisions, trade-offs, and future evolution paths.
+---
 
-## Architectural Evolution & Future-Proofing Strategy
+## 🧪 To Run
 
-This system is designed with modularity, durability, and event-driven evolution in mind. Key architectural decisions include:
+```bash
+./mvnw spring-boot:run
+```
 
-- **Queue-Based Ingestion**: Transactions are ingested via `LinkedTransferQueue`, decoupling producers from consumers. This abstraction allows seamless evolution to Kafka or other event brokers.
+Producers will begin streaming. Use REST endpoints to inspect runtime behavior.
 
-- **Pluggable Batching Strategy**: Audit grouping is delegated to a `BatchingAlgorithm` interface, enabling bin-packing optimization and future experimentation with time-windowed or cost-aware strategies.
+---
 
-- **Persistence Isolation**: Audit durability is handled by `AuditBatchPersistence`, a domain port that can evolve toward database, file, or event-sourced backends.
+## 📄 License
 
-- **External Submission via Notifier**: `AuditNotifier` encapsulates integration with external audit systems. It also handles observability concerns such as metrics and structured logging.
+MIT
+```
 
-- **Observability Decoupling**: Metrics are emitted from the notifier, not the core service, ensuring clean separation of concerns and future compatibility with MDC, Prometheus, or OpenTelemetry.
-
-### Kafka-Ready Design
-
-- `LinkedTransferQueue` can be replaced with a Kafka consumer loop.
-- `Transaction` events can be serialized and published to a topic.
-- `AuditProcessingService` becomes a consumer group member, enabling horizontal scaling.
-- `AuditNotifier` can evolve into a Kafka producer or sink connector.
-
-### Microservice Evolution
-
-Each domain (`Banking`, `Audit`, `Observability`) is isolated and package-aligned for bounded context extraction. This enables:
-
-- Independent deployment
-- Domain-specific scaling
-- Event-driven choreography
-
-This README is intended to guide reviewers through the architectural decisions, trade-offs, and future evolution paths of the system.
+---
