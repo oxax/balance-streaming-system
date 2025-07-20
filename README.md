@@ -59,16 +59,17 @@ AuditStatsService → REST API
 ---
 ## REST Endpoints
 
-| Endpoint               | Purpose                                                                            |
-|------------------------|------------------------------------------------------------------------------------|
-| `/account/balance`     | Fetch the current account balance                                                  |
-| `/transactions`        | Submit a transaction or query historical transactions                              |
-| `/simulation/start`    | Start transaction simulation with custom count and duration                        |
-| `/simulation/stop`     | Stop active transaction emitters                                                   |
-| `/audit/batches`       | Retrieve recently persisted audit batches                                          |
-| `/audit/stats`         | Fetch total audit batches and transactions processed                               |
-| `/audit/telemetry`     | View audit telemetry events and lifecycle signals                                  |
-| `/audit/summary`       | View consolidated audit and ingest metrics (TPS, latency, outcomes, batch stats)   |
+| Endpoint                      | Purpose                                                                            |
+|------------------------       |------------------------------------------------------------------------------------|
+| `/account/balance`            | Fetch the current account balance                                                  |
+| `/transactions/history`       | Retrieve transactions with optional range                                          |
+| `/transactions/submit`        | Submit a new transaction                                                           |
+| `/simulation/start`           | Start transaction simulation with custom count and duration                        |
+| `/simulation/stop`            | Stop active transaction emitters                                                   |
+| `/audit/batches`              | Retrieve recently persisted audit batches                                          |
+| `/audit/stats`                | Fetch total audit batches and transactions processed                               |
+| `/audit/telemetry`            | View audit telemetry events and lifecycle signals                                  |
+| `/audit/summary`              | View consolidated audit and ingest metrics (TPS, latency, outcomes, batch stats)   |
 
 ---
 
