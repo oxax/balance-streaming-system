@@ -1,11 +1,8 @@
 package com.arctiq.liquidity.balsys.transaction.transport;
 
 import com.arctiq.liquidity.balsys.account.application.BankAccountService;
-import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
-import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionAccepted;
-import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionInvalid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
