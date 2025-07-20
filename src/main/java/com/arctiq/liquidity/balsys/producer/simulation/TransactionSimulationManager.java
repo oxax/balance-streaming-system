@@ -1,22 +1,19 @@
-package com.arctiq.liquidity.balsys.producer.lifecycle;
+package com.arctiq.liquidity.balsys.producer.simulation;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.arctiq.liquidity.balsys.account.application.BankAccountService;
 import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.producer.channel.TransactionProducer;
 import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
-import com.arctiq.liquidity.balsys.producer.config.ProducerSettings;
 import com.arctiq.liquidity.balsys.producer.orchestration.TransactionProducerOrchestrator;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
-
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-
-import io.micrometer.core.instrument.MeterRegistry;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.util.concurrent.*;
 
@@ -27,47 +24,47 @@ public class TransactionSimulationManager {
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final ExecutorService emitExecutor = Executors.newFixedThreadPool(2);
-
-    private final TransactionProducer creditProducer;
-    private final TransactionProducer debitProducer;
-    private final TransactionConfigProperties config;
     private final TransactionProducerOrchestrator orchestrator;
     private final MetricsCollector metricsCollector;
-    private final ProducerSettings settings;
 
     public TransactionSimulationManager(
-            ProducerSettings settings,
-            TransactionProducer creditProducer,
-            TransactionProducer debitProducer,
             TransactionConfigProperties config,
             MetricsCollector metricsCollector,
             MeterRegistry meterRegistry,
             LinkedTransferQueue<Transaction> txQueue,
             BankAccountService accountService) {
 
-        this.settings = settings;
-        this.creditProducer = creditProducer;
-        this.debitProducer = debitProducer;
-        this.config = config;
         this.metricsCollector = metricsCollector;
 
-        this.orchestrator = new TransactionProducerOrchestrator(creditProducer, debitProducer, accountService, txQueue,
-                emitExecutor, meterRegistry, metricsCollector);
+        TransactionProducer creditProducer = () -> AuditTestFixtures.randomCredit(config);
+        TransactionProducer debitProducer = () -> AuditTestFixtures.randomDebit(config);
+
+        this.orchestrator = new TransactionProducerOrchestrator(
+                creditProducer,
+                debitProducer,
+                accountService,
+                txQueue,
+                emitExecutor,
+                meterRegistry,
+                metricsCollector);
     }
 
-    @PostConstruct
-    public void start() {
-        logger.info("🏁 Transaction simulation manager starting...");
-        ProducerConfig producerConfig = settings.toConfig();
-        orchestrator.startEmitLoops(producerConfig);
+    public void startSimulation(int transactionCount, int durationSeconds) {
+        logger.info("🟢 Starting simulation with {} transactions over {} seconds", transactionCount, durationSeconds);
+        ProducerConfig config = new ProducerConfig(transactionCount, durationSeconds);
+        orchestrator.startEmitLoops(config);
         scheduler.scheduleAtFixedRate(metricsCollector::logRuntimeMetrics, 5, 10, TimeUnit.SECONDS);
     }
 
-    @PreDestroy
-    public void stop() {
-        logger.info("🛑 Transaction simulation manager stopping...");
-        scheduler.shutdown();
-        emitExecutor.shutdown();
+    public void stopSimulation() {
+        logger.info("🛑 Stopping simulation...");
+        scheduler.shutdownNow();
+        emitExecutor.shutdownNow();
         metricsCollector.logRuntimeMetrics(); // final snapshot
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        stopSimulation();
     }
 }

@@ -22,11 +22,9 @@ public class TransactionController {
     private static final Logger logger = LoggerFactory.getLogger(TransactionController.class);
 
     private final BankAccountService bankAccountService;
-    private final MetricsCollector metricsCollector;
 
-    public TransactionController(BankAccountService bankAccountService, MetricsCollector metricsCollector) {
+    public TransactionController(BankAccountService bankAccountService) {
         this.bankAccountService = bankAccountService;
-        this.metricsCollector = metricsCollector;
     }
 
     @GetMapping
@@ -44,12 +42,8 @@ public class TransactionController {
     public ResponseEntity<OutcomeResponse> submitTransaction(@RequestBody Transaction tx) {
         try {
             bankAccountService.processTransaction(tx);
-            var outcome = new TransactionAccepted(tx);
-            metricsCollector.recordTransactionOutcome(outcome);
             return ResponseEntity.accepted().body(new OutcomeResponse("accepted", String.valueOf(tx.id().value())));
         } catch (TransactionValidationException ex) {
-            var outcome = new TransactionInvalid(tx, ex.getMessage());
-            metricsCollector.recordTransactionOutcome(outcome);
             logger.warn("Rejected transaction [{}]: {}", tx.id().value(), ex.getMessage());
             return ResponseEntity.badRequest().body(new OutcomeResponse("invalid", ex.getMessage()));
         } catch (Exception ex) {
@@ -59,16 +53,6 @@ public class TransactionController {
         }
     }
 
-    @GetMapping("/balance")
-    public BalanceResponse getBalance() {
-        double value = bankAccountService.retrieveBalance();
-        metricsCollector.recordBalance(value);
-        return new BalanceResponse(value);
-    }
-
     public record OutcomeResponse(String status, String detail) {
-    }
-
-    public record BalanceResponse(double balance) {
     }
 }

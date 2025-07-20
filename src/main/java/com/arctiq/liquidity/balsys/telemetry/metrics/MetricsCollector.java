@@ -1,5 +1,6 @@
 package com.arctiq.liquidity.balsys.telemetry.metrics;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 import com.arctiq.liquidity.balsys.audit.domain.AuditBatch;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionAccepted;
+import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionInvalid;
 import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionOutcome;
 
 import io.micrometer.core.instrument.Counter;
@@ -26,8 +28,14 @@ public class MetricsCollector {
     private static final Logger logger = LoggerFactory.getLogger(MetricsCollector.class);
 
     private final AtomicInteger queueSize = new AtomicInteger(0);
+    private final AtomicInteger acceptedTxCount = new AtomicInteger();
+    private final AtomicInteger invalidTxCount = new AtomicInteger();
+    private final AtomicInteger auditBatchCount = new AtomicInteger();
+    private final AtomicInteger totalAuditTransactions = new AtomicInteger();
+
     private final Counter droppedTxCounter;
     private final Timer auditLatencyTimer;
+    private final Instant startTime = Instant.now();
 
     public MetricsCollector(MeterRegistry registry) {
         Gauge.builder("audit_queue_size", queueSize, AtomicInteger::get)
@@ -70,15 +78,40 @@ public class MetricsCollector {
     }
 
     public void recordBalance(double balance) {
-        logger.info("Balance updated at {} | New Balance: {}",
-                Instant.now(),
-                String.format("%.2f", balance));
+        logger.info("Balance updated at {} | New Balance: {}", Instant.now(), String.format("%.2f", balance));
     }
 
     public void recordAuditSubmission(List<AuditBatch> batches) {
-        logger.info("Audit submission at {} | Submitted {} batches",
+        logger.info("Audit submission at {} | Submitted {} batches", Instant.now(), batches.size());
+        auditBatchCount.addAndGet(batches.size());
+        batches.forEach(batch -> totalAuditTransactions.addAndGet(batch.getTransactionCount()));
+    }
+
+    public void recordTransactionOutcome(TransactionOutcome outcome) {
+        if (outcome instanceof TransactionAccepted) {
+            acceptedTxCount.incrementAndGet();
+        } else if (outcome instanceof TransactionInvalid) {
+            invalidTxCount.incrementAndGet();
+        }
+
+        String type = outcome instanceof TransactionAccepted ? "Accepted" : "Invalid";
+        logger.debug("Transaction outcome [{}] at {} | Amount: {} | ID: {}",
+                type,
                 Instant.now(),
-                batches.size());
+                outcome.transaction() != null ? outcome.transaction().amount().amount() : "N/A",
+                outcome.transaction() != null ? outcome.transaction().id().value() : "N/A");
+    }
+
+    public void logRuntimeMetrics() {
+        logger.info("🧮 Metrics Snapshot [{}]", Instant.now());
+        logger.info(" - Queue Size: {}", getCurrentQueueSize());
+        logger.info(" - Dropped Tx: {}", getDroppedTxCount());
+        logger.info(" - Accepted Tx: {}", getAcceptedTxCount());
+        logger.info(" - Invalid Tx: {}", getInvalidTxCount());
+        logger.info(" - Audit Submissions: {}", getAuditBatchCount());
+        logger.info(" - Average Batch Size: {}", String.format("%.2f", getAverageBatchSize()));
+        getLatencySnapshot()
+                .forEach((k, v) -> logger.info(" - Audit Latency [{}]: {} ms", k, String.format("%.2f", v)));
     }
 
     public int getCurrentQueueSize() {
@@ -106,26 +139,29 @@ public class MetricsCollector {
                 .findFirst()
                 .orElse(-1.0);
 
-        return Map.of(
-                "mean", mean,
-                "max", max,
-                "p95", p95);
+        return Map.of("mean", mean, "max", max, "p95", p95);
     }
 
-    public void recordTransactionOutcome(TransactionOutcome outcome) {
-        String type = outcome instanceof TransactionAccepted ? "Accepted" : "Invalid";
-        logger.debug("Transaction outcome [{}] at {} | Amount: {} | ID: {}",
-                type,
-                Instant.now(),
-                null != outcome.transaction() ? outcome.transaction().amount().amount() : "N/A",
-                null != outcome.transaction() ? outcome.transaction().id().value() : "N/A");
+    public int getAcceptedTxCount() {
+        return acceptedTxCount.get();
     }
 
-    public void logRuntimeMetrics() {
-        logger.info("🧮 Metrics Snapshot [{}]", Instant.now());
-        logger.info(" - Queue Size: {}", getCurrentQueueSize());
-        logger.info(" - Dropped Tx: {}", getDroppedTxCount());
-        getLatencySnapshot()
-                .forEach((k, v) -> logger.info(" - Audit Latency [{}]: {} ms", k, String.format("%.2f", v)));
+    public int getInvalidTxCount() {
+        return invalidTxCount.get();
     }
+
+    public int getAuditBatchCount() {
+        return auditBatchCount.get();
+    }
+
+    public double getAverageBatchSize() {
+        int batchCount = auditBatchCount.get();
+        return batchCount > 0 ? (double) totalAuditTransactions.get() / batchCount : 0.0;
+    }
+
+    public double getAverageTPS() {
+        long elapsedMillis = Duration.between(startTime, Instant.now()).toMillis();
+        return elapsedMillis > 0 ? (acceptedTxCount.get() * 1000.0) / elapsedMillis : 0.0;
+    }
+
 }

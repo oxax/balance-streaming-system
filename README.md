@@ -57,16 +57,18 @@ AuditStatsService → REST API
 ```
 
 ---
-## 📡 REST Endpoints
+## REST Endpoints
 
-| Endpoint                  | Purpose                                      |
-|---------------------------|----------------------------------------------|
-| `/account/balance`        | Fetch the current account balance            |
-| `/simulation/start`       | Start transaction simulation with optional TPM |
-| `/simulation/stop`        | Stop active transaction producers            |
-| `/simulation/status`      | View queue status, balance, and ingest metrics |
-| `/simulation/metrics`     | View TPS metrics and audit submission stats  |
-| `/simulation/telemetry`   | View telemetry events for audit activity     |
+| Endpoint               | Purpose                                                                            |
+|------------------------|------------------------------------------------------------------------------------|
+| `/account/balance`     | Fetch the current account balance                                                  |
+| `/transactions`        | Submit a transaction or query historical transactions                              |
+| `/simulation/start`    | Start transaction simulation with custom count and duration                        |
+| `/simulation/stop`     | Stop active transaction emitters                                                   |
+| `/audit/batches`       | Retrieve recently persisted audit batches                                          |
+| `/audit/stats`         | Fetch total audit batches and transactions processed                               |
+| `/audit/telemetry`     | View audit telemetry events and lifecycle signals                                  |
+| `/audit/summary`       | View consolidated audit and ingest metrics (TPS, latency, outcomes, batch stats)   |
 
 ---
 

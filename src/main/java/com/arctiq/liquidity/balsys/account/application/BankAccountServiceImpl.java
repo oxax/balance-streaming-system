@@ -5,7 +5,6 @@ import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 import com.arctiq.liquidity.balsys.transaction.core.TransactionValidator;
-import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionOutcome;
 import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionAccepted;
 import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionInvalid;
 

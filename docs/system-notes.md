@@ -10,18 +10,18 @@ This document details the internal mechanics, design rationale, concurrency mode
 
 ## Domain Boundaries
 
-| Domain     | Package Prefix                              | Notes                                              |
-|------------|---------------------------------------------|----------------------------------------------------|
-| `account`  | `com.arctiq.liquidity.balsys.account`       | Applies transactions and computes running balance  |
-| `audit`    | `com.arctiq.liquidity.balsys.audit`         | Forms and persists audit batches via configurable rules |
-| `producer` | `com.arctiq.liquidity.balsys.producer`      | Streams transactions (credit/debit) via lifecycle hooks |
-| `shared`   | `com.arctiq.liquidity.balsys.shared`        | Cross-cutting domain models, validation, factories |
-| `telemetry`| `com.arctiq.liquidity.balsys.telemetry`     | AuditStats, telemetry registry, event timeline     |
+| Domain      | Package Prefix                                      | Notes                                                                  |
+|-------------|-----------------------------------------------------|------------------------------------------------------------------------|
+| `account`   | `com.arctiq.liquidity.balsys.transaction.service`   | Applies transactions and computes running balance                      |
+| `audit`     | `com.arctiq.liquidity.balsys.audit`                 | Forms and persists audit batches via pluggable batching strategies     |
+| `producer`  | `com.arctiq.liquidity.balsys.transaction.producer`  | Streams credit/debit transactions via orchestrated simulation loops    |
+| `shared`    | `com.arctiq.liquidity.balsys.shared`                | Common domain primitives, factories, and validation utilities          |
+| `telemetry` | `com.arctiq.liquidity.balsys.audit.telemetry`       | Runtime metrics, audit stats, transaction outcomes, and latency charts |
 
 ---
 
 
-## 🔧 Concurrency Model
+## Concurrency Model
 
 - Atomic balance via `AtomicReference<Double>`
 - Queue with backpressure via `LinkedTransferQueue` or `LinkedBlockingQueue`
@@ -62,20 +62,22 @@ This document details the internal mechanics, design rationale, concurrency mode
 
 ## Observability
 
-| Metric Point           | Recorded By                                      |
-|------------------------|--------------------------------------------------|
-| Transaction ingestion  | `MetricsCollector.recordTransaction`             |
-| Balance mutation       | `MetricsCollector.recordBalanceMutation`         |
-| Audit submission       | `MetricsCollector.recordAuditSubmission`         |
-| Runtime telemetry      | `AuditStatsService.recordTelemetryEvent`         |
-| Simulation status      | `SimulationManager.getLifecycleMetrics()`        |
+| Metric Point                | Recorded By                                    |
+|-----------------------------|------------------------------------------------|
+| Transaction ingestion       | `MetricsCollector.recordTransaction`           |
+| Transaction outcomes        | `MetricsCollector.recordTransactionOutcome`    |
+| Balance updates             | `MetricsCollector.recordBalance`               |
+| Audit submission            | `MetricsCollector.recordAuditSubmission`       |
+| Queue size monitoring       | `MetricsCollector.updateQueueSize`             |
+| Audit latency timing        | `MetricsCollector.recordAuditLatency`          |
+| Throughput (TPS) tracking   | `MetricsCollector.getAverageTPS`               |
+| Runtime telemetry events    | `AuditStatsService.recordTelemetryEvent`       |
 
-> Observability exposed via:
-> - `/simulation/status`
-> - `/simulation/metrics`
-> - `/simulation/telemetry`
-> - Console logs with structured batch and ingestion events
-```
+> Observability endpoints:
+> - `/audit/summary`
+> - `/audit/stats`
+> - `/audit/telemetry`
+> - Console logs with structured batch, ingest, and latency metrics
 
 ---
 
