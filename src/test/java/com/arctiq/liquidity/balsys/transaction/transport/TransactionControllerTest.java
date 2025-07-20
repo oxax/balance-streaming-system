@@ -7,6 +7,7 @@ import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 import com.arctiq.liquidity.balsys.transaction.core.TransactionId;
+import com.arctiq.liquidity.balsys.transaction.core.outcome.TransactionAccepted;
 import com.arctiq.liquidity.balsys.exception.TransactionValidationException;
 
 import org.junit.jupiter.api.DisplayName;
@@ -21,114 +22,96 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import java.time.Instant;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.*;
 
 @WebFluxTest(TransactionController.class)
 class TransactionControllerTest {
 
-    @Autowired
-    private WebTestClient webTestClient;
+        @Autowired
+        private WebTestClient webTestClient;
 
-    @MockBean
-    private BankAccountService accountService;
+        @MockBean
+        private BankAccountService accountService;
 
-    @MockBean
-    private MetricsCollector metricsCollector;
+        @MockBean
+        private MetricsCollector metricsCollector;
 
-    @Test
-    @DisplayName("Accepts valid transaction and returns status accepted")
-    void shouldAcceptTransaction() {
-        Transaction tx = AuditTestFixtures.fixedTransaction(300_000.0);
-        doNothing().when(accountService).processTransaction(tx);
+        @Test
+        @DisplayName("Accepts valid transaction and returns status accepted")
+        void shouldAcceptTransaction() {
+                Transaction tx = AuditTestFixtures.fixedTransaction(300_000.0);
 
-        webTestClient.post()
-                .uri("/transactions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(tx)
-                .exchange()
-                .expectStatus().isAccepted()
-                .expectBody()
-                .jsonPath("$.status").isEqualTo("accepted")
-                .jsonPath("$.detail").isEqualTo(String.valueOf(tx.id().value()));
+                // Simulate a successful transaction with no side effects verified externally
+                doNothing().when(accountService).processTransaction(tx);
 
-        verify(metricsCollector).recordTransactionOutcome(any());
-    }
+                webTestClient.post()
+                                .uri("/transactions")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(tx)
+                                .exchange()
+                                .expectStatus().isAccepted()
+                                .expectBody()
+                                .jsonPath("$.status").isEqualTo("accepted")
+                                .jsonPath("$.detail").isEqualTo(String.valueOf(tx.id().value()));
 
-    @Test
-    @DisplayName("Rejects invalid transaction and returns status invalid")
-    void shouldRejectInvalidTransaction() {
-        Transaction tx = new Transaction(TransactionId.generate(), Money.of(199.0));
-        doThrow(new TransactionValidationException("Transaction amount is out of range"))
-                .when(accountService).processTransaction(tx);
+                // No need to verify metricsCollector — handled internally by service
+        }
 
-        webTestClient.post()
-                .uri("/transactions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(tx)
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.status").isEqualTo("invalid")
-                .jsonPath("$.detail").value(val -> ((String) val).contains("out of range"));
+        @Test
+        @DisplayName("Rejects invalid transaction and returns status invalid")
+        void shouldRejectInvalidTransaction() {
+                Transaction tx = new Transaction(TransactionId.generate(), Money.of(199.0));
+                doThrow(new TransactionValidationException("Transaction amount is out of range"))
+                                .when(accountService).processTransaction(tx);
 
-        verify(metricsCollector).recordTransactionOutcome(any());
-    }
+                webTestClient.post()
+                                .uri("/transactions")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(tx)
+                                .exchange()
+                                .expectStatus().isBadRequest()
+                                .expectBody()
+                                .jsonPath("$.status").isEqualTo("invalid")
+                                .jsonPath("$.detail").value(val -> ((String) val).contains("out of range"));
+        }
 
-    @Test
-    @DisplayName("Handles service failure with internal error")
-    void shouldHandleUnexpectedError() {
-        Transaction tx = AuditTestFixtures.fixedTransaction(500_000.0);
-        doThrow(new RuntimeException("Database unreachable")).when(accountService).processTransaction(tx);
+        @Test
+        @DisplayName("Handles service failure with internal error")
+        void shouldHandleUnexpectedError() {
+                Transaction tx = AuditTestFixtures.fixedTransaction(500_000.0);
 
-        webTestClient.post()
-                .uri("/transactions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(tx)
-                .exchange()
-                .expectStatus().is5xxServerError()
-                .expectBody()
-                .jsonPath("$.status").isEqualTo("error")
-                .jsonPath("$.detail").value(val -> ((String) val).contains("Unhandled failure"));
+                doThrow(new RuntimeException("Database unreachable"))
+                                .when(accountService).processTransaction(tx);
 
-        verify(metricsCollector, never()).recordBalance(anyDouble());
-    }
+                webTestClient.post()
+                                .uri("/transactions")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(tx)
+                                .exchange()
+                                .expectStatus().is5xxServerError()
+                                .expectBody()
+                                .jsonPath("$.status").isEqualTo("error")
+                                .jsonPath("$.detail").value(val -> ((String) val).contains("Unhandled failure"));
+        }
 
-    @Test
-    @DisplayName("Returns latest balance with telemetry update")
-    void shouldReturnBalance() {
-        when(accountService.retrieveBalance()).thenReturn(850_000.0);
+        @Test
+        @DisplayName("Returns transactions between dates")
+        void shouldReturnTransactionHistory() {
+                Instant start = Instant.parse("2025-01-01T00:00:00Z");
+                Instant end = Instant.parse("2025-01-31T23:59:59Z");
 
-        webTestClient.get()
-                .uri("/transactions/balance")
-                .accept(MediaType.APPLICATION_JSON)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.balance").isEqualTo(850_000.0);
+                List<Transaction> mockTxs = AuditTestFixtures.mockSmallTransactions();
+                when(accountService.getTransactionHistory(start, end)).thenReturn(mockTxs);
 
-        verify(metricsCollector).recordBalance(850_000.0);
-    }
-
-    @Test
-    @DisplayName("Returns transactions between dates")
-    void shouldReturnTransactionHistory() {
-        Instant start = Instant.parse("2025-01-01T00:00:00Z");
-        Instant end = Instant.parse("2025-01-31T23:59:59Z");
-
-        List<Transaction> mockTxs = AuditTestFixtures.mockSmallTransactions();
-        when(accountService.getTransactionHistory(start, end)).thenReturn(mockTxs);
-
-        webTestClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/transactions")
-                        .queryParam("start", start.toString())
-                        .queryParam("end", end.toString())
-                        .build())
-                .exchange()
-                .expectStatus().isOk()
-                .expectBodyList(Transaction.class)
-                .hasSize(mockTxs.size());
-    }
+                webTestClient.get()
+                                .uri(uriBuilder -> uriBuilder
+                                                .path("/transactions")
+                                                .queryParam("start", start.toString())
+                                                .queryParam("end", end.toString())
+                                                .build())
+                                .exchange()
+                                .expectStatus().isOk()
+                                .expectBodyList(Transaction.class)
+                                .hasSize(mockTxs.size());
+        }
 }

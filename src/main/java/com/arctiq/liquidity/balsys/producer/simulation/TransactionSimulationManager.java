@@ -2,6 +2,7 @@ package com.arctiq.liquidity.balsys.producer.simulation;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,8 @@ import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
 
 import java.util.concurrent.*;
+
+import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
 
 @Component
 public class TransactionSimulationManager {
@@ -32,7 +35,8 @@ public class TransactionSimulationManager {
             MetricsCollector metricsCollector,
             MeterRegistry meterRegistry,
             LinkedTransferQueue<Transaction> txQueue,
-            BankAccountService accountService) {
+            BankAccountService accountService,
+            AuditProcessingService auditProcessingService) {
 
         this.metricsCollector = metricsCollector;
 
@@ -43,6 +47,7 @@ public class TransactionSimulationManager {
                 creditProducer,
                 debitProducer,
                 accountService,
+                auditProcessingService,
                 txQueue,
                 emitExecutor,
                 meterRegistry,
@@ -53,6 +58,7 @@ public class TransactionSimulationManager {
         logger.info("🟢 Starting simulation with {} transactions over {} seconds", transactionCount, durationSeconds);
         ProducerConfig config = new ProducerConfig(transactionCount, durationSeconds);
         orchestrator.startEmitLoops(config);
+        orchestrator.triggerAuditIfThresholdMet();
         scheduler.scheduleAtFixedRate(metricsCollector::logRuntimeMetrics, 5, 10, TimeUnit.SECONDS);
     }
 

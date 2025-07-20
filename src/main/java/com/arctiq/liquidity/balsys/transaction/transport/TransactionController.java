@@ -24,8 +24,12 @@ public class TransactionController {
         this.bankAccountService = bankAccountService;
     }
 
-    @GetMapping
-    public List<Transaction> getTransactions(
+    /**
+     * GET /transactions/history
+     * Optional query params: ?start=...&end=...
+     */
+    @GetMapping("/history")
+    public List<Transaction> getTransactionHistory(
             @RequestParam(value = "start", required = false) Instant start,
             @RequestParam(value = "end", required = false) Instant end) {
 
@@ -35,14 +39,19 @@ public class TransactionController {
         return bankAccountService.getTransactionHistory(effectiveStart, effectiveEnd);
     }
 
-    @PostMapping
+    /**
+     * POST /transactions/submit
+     */
+    @PostMapping("/submit")
     public ResponseEntity<OutcomeResponse> submitTransaction(@RequestBody Transaction tx) {
         try {
             bankAccountService.processTransaction(tx);
-            return ResponseEntity.accepted().body(new OutcomeResponse("accepted", String.valueOf(tx.id().value())));
+            return ResponseEntity.accepted()
+                    .body(new OutcomeResponse("accepted", String.valueOf(tx.id().value())));
         } catch (TransactionValidationException ex) {
             logger.warn("Rejected transaction [{}]: {}", tx.id().value(), ex.getMessage());
-            return ResponseEntity.badRequest().body(new OutcomeResponse("invalid", ex.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(new OutcomeResponse("invalid", ex.getMessage()));
         } catch (Exception ex) {
             logger.error("Unexpected transaction error [{}]: {}", tx.id().value(), ex.getMessage(), ex);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

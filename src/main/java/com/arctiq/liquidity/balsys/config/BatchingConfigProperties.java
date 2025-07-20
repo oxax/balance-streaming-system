@@ -1,8 +1,10 @@
 package com.arctiq.liquidity.balsys.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
 
 @ConfigurationProperties(prefix = "transaction.batching")
+@Component
 public class BatchingConfigProperties {
     private String strategy;
     private double valueLimit;

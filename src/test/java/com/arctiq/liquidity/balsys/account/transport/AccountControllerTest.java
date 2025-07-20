@@ -12,6 +12,8 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 import static org.mockito.Mockito.when;
 
+import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
+
 @WebFluxTest(AccountController.class)
 class AccountControllerTest {
 
@@ -21,6 +23,9 @@ class AccountControllerTest {
     @MockBean
     private BankAccountService bankAccountService;
 
+    @MockBean
+    private MetricsCollector metricsCollector; // ← Add this
+
     @Test
     @DisplayName("Exposes current balance as JSON via /balance")
     void shouldReturnBalanceViaRest() {
@@ -28,7 +33,7 @@ class AccountControllerTest {
         when(bankAccountService.retrieveBalance()).thenReturn(mockedBalance);
 
         webTestClient.get()
-                .uri("/balance")
+                .uri("/account/balance")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk()

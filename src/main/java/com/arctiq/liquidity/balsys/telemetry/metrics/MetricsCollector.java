@@ -71,14 +71,14 @@ public class MetricsCollector {
     }
 
     public void recordTransaction(Transaction tx) {
-        logger.info("Transaction recorded at {} | Type: {} | Amount: {}",
+        logger.debug("Transaction recorded at {} | Type: {} | Amount: {}",
                 Instant.now(),
                 tx.isCredit() ? "Credit" : "Debit",
                 String.format("%.2f", tx.amount().amount()));
     }
 
     public void recordBalance(double balance) {
-        logger.info("Balance updated at {} | New Balance: {}", Instant.now(), String.format("%.2f", balance));
+        logger.debug("Balance updated at {} | New Balance: {}", Instant.now(), String.format("%.2f", balance));
     }
 
     public void recordAuditSubmission(List<AuditBatch> batches) {

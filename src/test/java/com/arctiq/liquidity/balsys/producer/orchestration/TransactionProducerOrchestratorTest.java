@@ -5,6 +5,8 @@ import com.arctiq.liquidity.balsys.account.application.BankAccountServiceImpl;
 import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.producer.channel.TransactionProducer;
 import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
+import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
+import com.arctiq.liquidity.balsys.shared.domain.model.Money;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
@@ -23,12 +25,21 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.arctiq.liquidity.balsys.audit.application.AuditStatsService;
+import com.arctiq.liquidity.balsys.audit.dispatch.ConsoleAuditNotifier;
+import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
+import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
+import com.arctiq.liquidity.balsys.audit.persistence.InMemoryAuditBatchStore;
+
 class TransactionProducerOrchestratorTest {
 
     private static final Logger logger = LoggerFactory.getLogger(TransactionProducerOrchestratorTest.class);
 
     LinkedTransferQueue<Transaction> queue;
     BankAccountService accountService;
+    AuditProcessingService auditProcessingService;
     ExecutorService executor;
     private MetricsCollector metrics;
     private TransactionConfigProperties configProperties;
@@ -38,7 +49,13 @@ class TransactionProducerOrchestratorTest {
         configProperties = AuditTestFixtures.config();
         queue = new LinkedTransferQueue<>();
         metrics = new MetricsCollector(new SimpleMeterRegistry());
+        AuditStatsService statsService = new AuditStatsService();
         executor = Executors.newFixedThreadPool(2);
+        AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
+        AuditNotifier notifier = new ConsoleAuditNotifier(metrics, statsService);
+        BatchingStrategy batchingStrategy = new GreedyBatchingStrategy(Money.of(configProperties.getMaxBatchValue()));
+        auditProcessingService = new AuditProcessingService(queue, configProperties, batchingStrategy, notifier,
+                persistence, metrics);
         accountService = new BankAccountServiceImpl(queue, configProperties, metrics);
     }
 
@@ -55,6 +72,7 @@ class TransactionProducerOrchestratorTest {
                 creditProducer,
                 debitProducer,
                 accountService,
+                auditProcessingService,
                 queue,
                 executor,
                 new SimpleMeterRegistry(),

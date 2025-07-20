@@ -19,6 +19,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
+import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
+
 public class TransactionProducerOrchestrator {
 
     private static final Logger logger = LoggerFactory.getLogger(TransactionProducerOrchestrator.class);
@@ -26,6 +28,9 @@ public class TransactionProducerOrchestrator {
     private final TransactionProducer creditProducer;
     private final TransactionProducer debitProducer;
     private final BankAccountService accountService;
+
+    private final AuditProcessingService auditProcessingService;
+
     private final LinkedTransferQueue<Transaction> queue;
     private final ExecutorService executor;
     private final MetricsCollector metricsCollector;
@@ -38,6 +43,7 @@ public class TransactionProducerOrchestrator {
             TransactionProducer creditProducer,
             TransactionProducer debitProducer,
             BankAccountService accountService,
+            AuditProcessingService auditProcessingService,
             LinkedTransferQueue<Transaction> queue,
             ExecutorService executor,
             MeterRegistry meterRegistry,
@@ -46,6 +52,7 @@ public class TransactionProducerOrchestrator {
         this.creditProducer = creditProducer;
         this.debitProducer = debitProducer;
         this.accountService = accountService;
+        this.auditProcessingService = auditProcessingService;
         this.queue = queue;
         this.executor = executor;
         this.metricsCollector = metricsCollector;
@@ -62,7 +69,7 @@ public class TransactionProducerOrchestrator {
     }
 
     public void startEmitLoops(ProducerConfig producerConfig) {
-        logger.info("Starting emission: {} tx/stream every {}s", producerConfig.count(),
+        logger.debug("Starting emission: {} tx/stream every {}s", producerConfig.count(),
                 producerConfig.intervalSeconds());
 
         executor.submit(() -> emitLoop(creditProducer, producerConfig));
@@ -101,9 +108,13 @@ public class TransactionProducerOrchestrator {
             }
         }
 
-        logger.info("Emission completed for producer: {}. Successful emissions: {}",
+        logger.debug("Emission completed for producer: {}. Successful emissions: {}",
                 producer.getClass().getSimpleName(), successfulEmissions);
 
         currentEmissionRate.set(0);
+    }
+
+    public void triggerAuditIfThresholdMet() {
+        auditProcessingService.flushIfThresholdMet();
     }
 }

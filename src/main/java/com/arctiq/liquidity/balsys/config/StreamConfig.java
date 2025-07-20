@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import com.arctiq.liquidity.balsys.account.application.BankAccountService;
 import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
 import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
 import com.arctiq.liquidity.balsys.producer.channel.CreditProducer;
 import com.arctiq.liquidity.balsys.producer.channel.DebitProducer;
 import com.arctiq.liquidity.balsys.producer.config.ProducerConfig;
@@ -45,6 +46,7 @@ public class StreamConfig {
             CreditProducer creditProducer,
             DebitProducer debitProducer,
             BankAccountService accountService,
+            AuditProcessingService auditProcessingService,
             LinkedTransferQueue<Transaction> transactionQueue,
             ExecutorService auditExecutor, MeterRegistry meterRegistry,
             MetricsCollector metricsCollector) {
@@ -52,17 +54,19 @@ public class StreamConfig {
                 creditProducer,
                 debitProducer,
                 accountService,
+                auditProcessingService,
                 transactionQueue,
                 auditExecutor, meterRegistry, metricsCollector);
     }
 
-    @Bean
-    public CommandLineRunner ingestionStarter(TransactionProducerOrchestrator orchestrator) {
-        return args -> {
-            // emits 1000 transactions over 60 seconds per stream (≈16.67 tx/sec)
-            orchestrator.startEmitLoops(new ProducerConfig(1000, 60));
-        };
-    }
+    // @Bean
+    // public CommandLineRunner ingestionStarter(TransactionProducerOrchestrator
+    // orchestrator) {
+    // return args -> {
+    // // emits 1000 transactions over 60 seconds per stream (≈16.67 tx/sec)
+    // orchestrator.startEmitLoops(new ProducerConfig(1000, 60));
+    // };
+    // }
 
     @Bean
     @ConditionalOnProperty(name = "transaction.batching.strategy", havingValue = "greedy")

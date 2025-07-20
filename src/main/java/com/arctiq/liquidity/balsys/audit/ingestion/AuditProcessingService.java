@@ -28,7 +28,6 @@ public class AuditProcessingService {
     private final MetricsCollector metrics;
 
     private final ExecutorService auditExecutor;
-    private final ScheduledExecutorService scheduler;
 
     private final int submissionLimit;
     private final AtomicBoolean submitting = new AtomicBoolean(false);
@@ -49,20 +48,15 @@ public class AuditProcessingService {
         this.metrics = metrics;
 
         this.auditExecutor = Executors.newFixedThreadPool(config.getAuditThreads());
-        this.scheduler = Executors.newScheduledThreadPool(1);
-
-        scheduler.scheduleAtFixedRate(this::flushDueToTimeout,
-                config.getFlushIntervalMillis(),
-                config.getFlushIntervalMillis(),
-                TimeUnit.MILLISECONDS);
 
         logger.info("AuditProcessingService initialized:");
         logger.info("  - Queue capacity: {}", config.getQueueCapacity());
         logger.info("  - Submission limit: {}", config.getSubmissionLimit());
-        logger.info("  - Flush interval (ms): {}", config.getFlushIntervalMillis());
         logger.info("  - Audit threads: {}", config.getAuditThreads());
+        logger.info("  ❎ No scheduler is configured — service is passive until triggered.");
     }
 
+    /** Accept transaction and conditionally trigger processing **/
     public boolean ingest(Transaction tx) {
         logger.debug("Ingesting transaction: {}", tx);
         boolean accepted = transactionQueue.offer(tx);
@@ -72,27 +66,23 @@ public class AuditProcessingService {
             logger.warn("Queue saturated. Dropping transaction: {}", tx);
             persistDropped(tx);
             metrics.incrementDropped(tx);
+            return false;
         }
-        return accepted;
+
+        flushIfThresholdMet();
+        return true;
     }
 
+    /** Trigger processing if queue exceeds threshold **/
     public void flushIfThresholdMet() {
-        logger.info("Checking submission threshold: queueSize={}, submissionLimit={}", transactionQueue.size(),
-                submissionLimit);
+        logger.info("Threshold check: queueSize={}, submissionLimit={}", transactionQueue.size(), submissionLimit);
         if (transactionQueue.size() >= submissionLimit && submitting.compareAndSet(false, true)) {
-            logger.info("Submission threshold met. Triggering audit flush.");
+            logger.debug("Submission threshold met. Running audit cycle.");
             auditExecutor.submit(this::runAuditCycle);
         }
     }
 
-    private void flushDueToTimeout() {
-        logger.info("Scheduled flush check: queueSize={}", transactionQueue.size());
-        if (!transactionQueue.isEmpty() && submitting.compareAndSet(false, true)) {
-            logger.info("Scheduled flush triggered. Submitting audit cycle.");
-            auditExecutor.submit(this::runAuditCycle);
-        }
-    }
-
+    /** Audit batching and persistence cycle **/
     private void runAuditCycle() {
         logger.info("Starting audit cycle...");
         Timer.Sample latencySample = metrics.startAuditLatencySample();
@@ -103,7 +93,7 @@ public class AuditProcessingService {
             metrics.updateQueueSize(transactionQueue.size());
 
             if (drained.isEmpty()) {
-                logger.info("Audit cycle skipped. No transactions drained.");
+                logger.info("No transactions to process. Skipping batch.");
                 return;
             }
 
@@ -116,18 +106,19 @@ public class AuditProcessingService {
             notifier.submit(grouped);
 
             auditBatchPersistence.markSubmitted(batchId);
-            logger.info("Audit batch [{}] submitted. Transaction count: {}, sub-batches: {}", batchId, drained.size(),
-                    grouped.size());
+            logger.info("Audit batch [{}] submitted. Transaction count: {}, sub-batches: {}",
+                    batchId, drained.size(), grouped.size());
 
         } catch (Exception e) {
             logger.error("Audit cycle failure: {}", e.getMessage(), e);
         } finally {
             submitting.set(false);
             metrics.recordAuditLatency(latencySample);
-            logger.info("Audit cycle complete. Submission flag cleared.");
+            logger.info("Audit cycle completed. Submission lock released.");
         }
     }
 
+    /** Persist dropped transactions when queue is full **/
     private void persistDropped(Transaction tx) {
         String dropId = "dropped-" + UUID.randomUUID();
         logger.info("Persisting dropped transaction [{}]", dropId);
@@ -138,10 +129,10 @@ public class AuditProcessingService {
         }
     }
 
+    /** Graceful shutdown method (e.g. called on lifecycle hook) **/
     public void shutdown() {
         logger.info("Initiating shutdown of AuditProcessingService...");
-        scheduler.shutdown();
         auditExecutor.shutdown();
-        logger.info("AuditProcessingService shut down completed.");
+        logger.info("AuditProcessingService shutdown complete.");
     }
 }
