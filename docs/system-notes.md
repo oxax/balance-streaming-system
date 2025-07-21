@@ -62,6 +62,7 @@ http.authorizeHttpRequests(auth -> auth
   .requestMatchers("/audit/**").hasRole("OPS")
   .anyRequest().authenticated());
 
+```
 ## 🎛️ Controller Overview & Swagger
 
 Each controller is annotated with full OpenAPI metadata:
