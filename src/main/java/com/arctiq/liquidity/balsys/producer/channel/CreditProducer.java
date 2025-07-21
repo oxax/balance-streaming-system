@@ -1,6 +1,7 @@
 package com.arctiq.liquidity.balsys.producer.channel;
 
 import java.util.random.RandomGenerator;
+import java.util.random.RandomGeneratorFactory;
 
 import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.shared.domain.model.Money;
@@ -9,7 +10,8 @@ import com.arctiq.liquidity.balsys.transaction.core.TransactionId;
 
 public class CreditProducer implements TransactionProducer {
 
-    private final RandomGenerator generator = RandomGenerator.getDefault();
+    // private final RandomGenerator generator = RandomGenerator.getDefault();
+    private final RandomGenerator generator = RandomGeneratorFactory.of("Xoshiro256PlusPlus").create();
     private final TransactionConfigProperties config;
 
     public CreditProducer(TransactionConfigProperties config) {
