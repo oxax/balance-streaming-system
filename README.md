@@ -95,11 +95,11 @@ Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 
 | Concern             | AWS Service Suggestion            |
 |---------------------|-----------------------------------|
-| Queue ingestion     | Kafka (MSK) or Kinesis            |
+| Queue ingestion     | Kafka or Kinesis            |
 | Persistence         | Aurora or DynamoDB               |
 | Batch durability    | Amazon S3 or PostgreSQL          |
 | External audit flow | EventBridge or SNS               |
-| Observability       | CloudWatch, X-Ray, QuickSight    |
+| Observability       | CloudWatch    |
 
 ---
 
@@ -139,11 +139,11 @@ Automated Maven-based workflow via GitHub Actions:
 ```
 ## Run with Docker
 
-### Build Container Image
+1. Build Container Image
 ```
 docker build -t balsys .
 ```
-### Run Container
+2. Run Container
 ```
 docker run -p 8080:8080 balsys
 ```
