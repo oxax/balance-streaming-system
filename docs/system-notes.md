@@ -4,9 +4,32 @@ This document details the internal mechanics, design rationale, concurrency mode
 
 ---
 
-## 📷 Architecture Diagram
+## System Architecture
 
-![Architecture Diagram](system-architecture.png)
+### Layered Architecture Overview
+
+The system is composed of modular layers that separate runtime concerns and domain ownership. The diagram below illustrates the separation between transaction ingestion (balance domain) and audit batching (audit domain), along with decoupling via the queue interface.
+
+![Layered System Architecture](layered-system-architecture.png)
+
+**Key architectural features:**
+- Balance domain processes live transactions and maintains the account state
+- Audit domain monitors transactional activity and triggers batch submission
+- Lock-free queue decouples processing, enabling concurrent balance and audit flows
+- Metrics and telemetry are collected independently for operational observability
+
+### Flow Architecture Overview
+
+The diagram below illustrates the runtime flow of the system, emphasizing the decoupled paths for balance tracking and audit batching:
+
+![System Flow Diagram](system-flow-architecture.png)
+
+- Producers emit credit/debit transactions asynchronously
+- BankAccountService applies transactions atomically to an in-memory balance
+- Transactions are concurrently forwarded into a lock-free queue
+- AuditProcessingService monitors the queue and triggers submission after 1000 transactions
+- Batches are formed using a configurable strategy (`Greedy` or `FirstFitDecreasing`)
+- Console output is handled by `AuditNotifier` (specifically `ConsoleAuditNotifier`)
 
 ## Domain Boundaries
 
@@ -77,10 +100,10 @@ All use `@Operation`, `@ApiResponses`, and tagged grouping for easy Swagger navi
 
 - Queue: `LinkedTransferQueue<Transaction>` held in `AuditProcessingService` (audit package)  
 - Trigger: On each enqueue, if `queue.size() ≥ auditConfig.getBatchSize()` (1 000), start batch formation  
-- Algorithm: `GreedyBatchingStrategy` and `FirstFitDecreasingBatchingStrategy` (implements `BatchingStrategy`)
-  - Sorts transactions by descending absolute value (`|amount|`)
-  - Groups them into the smallest number of batches possible
-  - Each batch total constrained to `config.getMaxBatchValue()` (e.g. £1,000,000) 
+- Two batching algorithms are supported:
+  - `GreedyBatchingStrategy`: inserts into first batch that fits
+  - `FirstFitDecreasingBatchingStrategy`: sorts descending, minimizes number of batches (O(n log n))
+  - The active strategy is selected via Spring property: application.properties: transaction.batching.strategy=ffd
 - Design Intent:
   - Optimized for packing efficiency (first-fit greedy)
   - Favors large transactions first to prevent early overflow

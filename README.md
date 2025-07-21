@@ -2,7 +2,9 @@
 **High-Throughput, Low-Latency Transaction Engine**
 A performance-aware Java system that simulates streaming credit/debit ingestion, balance computation, and audit batching — designed with modular domain boundaries, observability, and microservice evolution in mind.
 
-![Architecture Diagram](./docs/system-architecture.png)
+### Architectural Layers
+
+![Layered System Architecture](./docs/layered-system-architecture.png)
 
 ## Project Objective
 
@@ -62,6 +64,21 @@ AuditBatchPersistence + AuditNotifier
         ↓
 AuditStatsService → REST API
 ```
+---
+
+## Audit Batching Behavior
+
+Audit submissions occur automatically after **exactly 1000 processed transactions**, matching the technical exercise requirement.
+Batches are assembled using a pluggable `BatchingStrategy`, with two available options:
+- `GreedyBatchingStrategy`: inserts transactions sequentially into the first acceptable batch
+- `FirstFitDecreasingBatchingStrategy`: sorts transactions by absolute value descending and minimizes batch count using near-optimal bin packing
+
+Each batch:
+- Contains only transactions that sum to **≤ £1,000,000** (credits and debits treated as positive)
+- Is computed using the domain-accurate `Money` abstraction
+
+Upon submission, batch details are printed to the console by the `ConsoleAuditNotifier`, in a format compliant with the spec:
+
 ---
 
 ## 🔐 Access Control
