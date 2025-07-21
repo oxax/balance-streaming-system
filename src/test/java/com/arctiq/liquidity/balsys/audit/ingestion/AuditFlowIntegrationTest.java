@@ -9,6 +9,7 @@ import com.arctiq.liquidity.balsys.config.TransactionConfigProperties;
 import com.arctiq.liquidity.balsys.telemetry.metrics.MetricsCollector;
 import com.arctiq.liquidity.balsys.shared.audit.AuditNotifier;
 import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.grouping.FirstFitDecreasingBatchingStrategy;
 import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
 import com.arctiq.liquidity.balsys.testfixtures.AuditTestFixtures;
 import com.arctiq.liquidity.balsys.transaction.core.Transaction;
@@ -35,7 +36,9 @@ class AuditFlowIntegrationTest {
         MetricsCollector metrics = new MetricsCollector(new SimpleMeterRegistry());
         AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
         AuditNotifier notifier = new ConsoleAuditNotifier();
-        BatchingStrategy batchingStrategy = new GreedyBatchingStrategy(Money.of(config.getMaxBatchValue()));
+        // BatchingStrategy batchingStrategy = new
+        // GreedyBatchingStrategy(Money.of(config.getMaxBatchValue()));
+        BatchingStrategy batchingStrategy = new FirstFitDecreasingBatchingStrategy(Money.of(config.getMaxBatchValue()));
         LinkedTransferQueue<Transaction> queue = new LinkedTransferQueue<>();
 
         BankAccountService accountService = new BankAccountServiceImpl(queue, config, metrics);

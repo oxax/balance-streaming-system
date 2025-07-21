@@ -23,7 +23,8 @@ class BatchingAlgorithmTest {
     @BeforeEach
     void setup() {
         config = AuditTestFixtures.config();
-        batchingStrategy = new GreedyBatchingStrategy(Money.of(config.getMaxBatchValue()));
+        batchingStrategy = new FirstFitDecreasingBatchingStrategy(Money.of(config.getMaxBatchValue()));
+
     }
 
     @Test

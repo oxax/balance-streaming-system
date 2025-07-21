@@ -16,7 +16,7 @@ import com.arctiq.liquidity.balsys.account.application.BankAccountServiceImpl;
 import com.arctiq.liquidity.balsys.audit.application.AuditStatsService;
 import com.arctiq.liquidity.balsys.audit.dispatch.ConsoleAuditNotifier;
 import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
-import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.grouping.FirstFitDecreasingBatchingStrategy;
 import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
 import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
 import com.arctiq.liquidity.balsys.audit.persistence.InMemoryAuditBatchStore;
@@ -51,7 +51,7 @@ class TransactionProducerOrchestratorTest {
                 executor = Executors.newFixedThreadPool(2);
                 AuditBatchPersistence persistence = new InMemoryAuditBatchStore();
                 AuditNotifier notifier = new ConsoleAuditNotifier();
-                BatchingStrategy batchingStrategy = new GreedyBatchingStrategy(
+                BatchingStrategy batchingStrategy = new FirstFitDecreasingBatchingStrategy(
                                 Money.of(configProperties.getMaxBatchValue()));
                 auditProcessingService = new AuditProcessingService(queue, configProperties, batchingStrategy, notifier,
                                 persistence, metrics);

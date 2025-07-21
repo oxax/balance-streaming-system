@@ -77,7 +77,7 @@ All use `@Operation`, `@ApiResponses`, and tagged grouping for easy Swagger navi
 
 - Queue: `LinkedTransferQueue<Transaction>` held in `AuditProcessingService` (audit package)  
 - Trigger: On each enqueue, if `queue.size() ≥ auditConfig.getBatchSize()` (1 000), start batch formation  
-- Algorithm: `GreedyBatchingStrategy` (implements `BatchingStrategy`)
+- Algorithm: `GreedyBatchingStrategy` and `FirstFitDecreasingBatchingStrategy` (implements `BatchingStrategy`)
   - Sorts transactions by descending absolute value (`|amount|`)
   - Groups them into the smallest number of batches possible
   - Each batch total constrained to `config.getMaxBatchValue()` (e.g. £1,000,000) 

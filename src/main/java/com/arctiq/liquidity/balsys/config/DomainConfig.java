@@ -5,7 +5,7 @@ import com.arctiq.liquidity.balsys.account.application.BankAccountServiceImpl;
 import com.arctiq.liquidity.balsys.audit.application.AuditStatsService;
 import com.arctiq.liquidity.balsys.audit.dispatch.ConsoleAuditNotifier;
 import com.arctiq.liquidity.balsys.audit.grouping.BatchingStrategy;
-import com.arctiq.liquidity.balsys.audit.grouping.GreedyBatchingStrategy;
+import com.arctiq.liquidity.balsys.audit.grouping.FirstFitDecreasingBatchingStrategy;
 import com.arctiq.liquidity.balsys.audit.ingestion.AuditProcessingService;
 import com.arctiq.liquidity.balsys.audit.persistence.AuditBatchPersistence;
 import com.arctiq.liquidity.balsys.audit.persistence.InMemoryAuditBatchStore;
@@ -39,7 +39,7 @@ public class DomainConfig {
     @Bean
     public BatchingStrategy batchingStrategy(TransactionConfigProperties config) {
         Money batchLimit = Money.of(config.getMaxBatchValue());
-        return new GreedyBatchingStrategy(batchLimit);
+        return new FirstFitDecreasingBatchingStrategy(batchLimit);
     }
 
     @Bean
