@@ -137,9 +137,16 @@ Automated Maven-based workflow via GitHub Actions:
 ```bash
 ./mvnw spring-boot:run
 ```
+## Run with Docker
 
-Producers will begin streaming. Use REST endpoints to inspect runtime behavior.
-
+### Build Container Image
+```
+docker build -t balsys .
+```
+### Run Container
+```
+docker run -p 8080:8080 balsys
+```
 ---
 
 ## 📄 License
