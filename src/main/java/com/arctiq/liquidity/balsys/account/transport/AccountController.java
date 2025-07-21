@@ -28,7 +28,7 @@ public class AccountController {
         this.metricsCollector = metricsCollector;
     }
 
-    @PreAuthorize("hasAnyRole('USER', 'OPS')")
+    // @PreAuthorize("hasAnyRole('USER', 'OPS')")
     @Operation(summary = "Get current account balance", description = "Returns the latest computed balance after applying all ingested transactions.")
     @ApiResponse(responseCode = "200", description = "Balance retrieved successfully")
     @GetMapping(value = "/balance", produces = MediaType.APPLICATION_JSON_VALUE)

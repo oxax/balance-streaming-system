@@ -2,25 +2,28 @@ package com.arctiq.liquidity.balsys.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 
 @Configuration
+@EnableWebFluxSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
-
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        return http
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/account/**").hasAnyRole("USER", "OPS")
-                        .requestMatchers("/simulation/**").hasRole("OPS")
-                        .requestMatchers("/audit/**").hasRole("OPS")
-                        .anyRequest().authenticated())
-                .httpBasic();
-        return http.build();
+                .authorizeExchange(exchange -> exchange
+                        .pathMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .pathMatchers("/account/**").permitAll()
+                        .pathMatchers("/simulation/**", "/audit/**").permitAll()
+                        // .pathMatchers("/account/**").hasAnyRole("USER", "OPS")
+                        // .pathMatchers("/simulation/**", "/audit/**").hasRole("OPS")
+                        .anyExchange().authenticated())
+                .httpBasic(Customizer.withDefaults())
+                .build();
     }
 }
