@@ -4,25 +4,32 @@ A performance-aware Java system that simulates streaming credit/debit ingestion,
 
 ![Architecture Diagram](./docs/system-architecture.png)
 
-## Problem Summary
+## Project Objective
 
 Design an application that:
 
-- Ingests credit/debit transactions at 50 TPS (25 credits + 25 debits).  
+- Ingests and processes real-time credit/debit transactions at 50 TPS (25 credits + 25 debits).  
 - Tracks a single account’s balance in real time, exposed via REST.  
 - Every 1,000 transactions, forms batches whose absolute sum ≤ £1,000,000.  
+- Role-protected API surface (`USER`, `OPS`)
 - Minimizes the number of batches per submission to reduce costs.  
 - Exposes rich metrics and supports performance validation.
 
+The system emphasizes clean domain boundaries, operational observability, and architectural evolution toward event-driven microservices.
+
 ---
+
 ## Features
 
-- Real-time credit/debit ingestion (~50 TPS simulated)
-- Atomic balance mutation with telemetry hooks
-- Bin-packed audit batches under £1M constraint
-- Pluggable batching algorithm
+- Real-time credit/debit transaction ingestion simulation (~50 TPS)
+- Atomic balance updates with observability hooks
+- Role-based security: OPS and USER scoped access
+- Configurable batching algorithm for cost-efficient submissions
+- REST APIs for balance, audit stats, and simulation control
 - In-memory persistence layer (swappable)
-- REST APIs for transaction, balance, audit stats, and telemetry
+- CI pipeline via GitHub Actions
+- Observability-first: REST APIs for transaction, balance, audit stats, and telemetry
+- Architected for scalability, clarity, and production-grade CI/CD readiness.
 
 ---
 
@@ -55,24 +62,34 @@ AuditBatchPersistence + AuditNotifier
         ↓
 AuditStatsService → REST API
 ```
+---
+
+## 🔐 Access Control
+
+| Role     | Username | Password  | Permissions                        |
+|----------|----------|-----------|------------------------------------|
+| `USER`   | `user`   | `password`| Account balance access             |
+| `OPS`    | `ops`    | `password`| Simulation + Audit control         |
+
+Postman: Use Basic Auth → Authorization tab → Type: Basic Auth
 
 ---
+
 ## REST Endpoints
 
-| Endpoint                      | Purpose                                                                            |
-|------------------------       |------------------------------------------------------------------------------------|
-| `/account/balance`            | Fetch the current account balance                                                  |
-| `/transactions/history`       | Retrieve transactions with optional range                                          |
-| `/transactions/submit`        | Submit a new transaction                                                           |
-| `/simulation/start`           | Start transaction simulation with custom count and duration                        |
-| `/simulation/stop`            | Stop active transaction emitters                                                   |
-| `/audit/batches`              | Retrieve recently persisted audit batches                                          |
-| `/audit/stats`                | Fetch total audit batches and transactions processed                               |
-| `/audit/telemetry`            | View audit telemetry events and lifecycle signals                                  |
-| `/audit/summary`              | View consolidated audit and ingest metrics (TPS, latency, outcomes, batch stats)   |
+| Endpoint              | Summary                                 | Role    |
+|-----------------------|------------------------------------------|---------|
+| `/account/balance`    | Returns computed account balance         | USER/OPS|
+| `/simulation/start`   | Starts transaction emitters              | OPS     |
+| `/simulation/stop`    | Stops active simulation                  | OPS     |
+| `/audit/summary`      | View audit stats and telemetry snapshot  | OPS     |
+| `/audit/batches`      | Retrieve audit batch history             | OPS     |
+| `/audit/stats`        | Aggregated audit totals                  | OPS     |
+| `/audit/telemetry`    | Lifecycle metrics and queue signals      | OPS     |
+
+Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 
 ---
-
 
 ## ☁️ Cloud-Ready Design
 
@@ -89,14 +106,33 @@ AuditStatsService → REST API
 ## 🧠 Architectural Highlights
 
 - Clean separation of domains → microservice-ready
+- Domain-aligned packages for account, audit, producer, transaction, telemetry, shared
 - Lock-free concurrency and backpressure via bounded queue
-- Configurable batching threshold
+- Pluggable strategy interface: switch batching algorithms at runtime
 - Observability-first with structured metrics
+- Prepared for microservice evolution and containerization
 - Ready for async event ingestion via Kafka or streaming gateway
 
 ---
 
-## 🧪 To Run
+## CI/CD Integration
+
+Automated Maven-based workflow via GitHub Actions:
+- Validates builds and runs tests on every push
+- Extensible to support deployment to cloud environments
+- CI/CD configuration is located in `.github/workflows` directory
+- Future-ready for Docker, ECS, and staging promotion
+
+---
+
+## Validation Tips
+
+- Simulate traffic with http://localhost:8080/simulation/start?count=1000&durationSeconds=10
+- Watch http://localhost:8080/audit/summary for average TPS and batch composition
+
+---
+
+## How to Run Locally
 
 ```bash
 ./mvnw spring-boot:run
@@ -110,5 +146,4 @@ Producers will begin streaming. Use REST endpoints to inspect runtime behavior.
 
 MIT
 ```
-
 ---
